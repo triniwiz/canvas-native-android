@@ -15,6 +15,10 @@ public class CanvasColorStyle {
             this.color = color;
         }
 
+        public Color(String color) {
+            this.color = Colors.getColor(color);
+        }
+
         @Override
         public CanvasColorStyleType getStyleType() {
             return CanvasColorStyleType.Color;

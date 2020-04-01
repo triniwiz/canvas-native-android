@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           package="com.github.triniwiz.canvasdemo">
 <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-feature android:glEsVersion="0x00020000" android:required="true" />
+
     <application
             android:hardwareAccelerated="true"
             android:allowBackup="true"

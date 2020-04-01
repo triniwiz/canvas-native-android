@@ -1,9 +1,9 @@
 package com.github.triniwiz.canvas;
 
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
+import android.opengl.GLES10;
+import android.opengl.GLES20;
 
 
 /**
@@ -18,7 +18,13 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeStroke(long canvas_ptr);
 
+    private static native long nativeStrokePath(long canvas_ptr, long path);
+
     private static native long nativeFill(long canvas_ptr);
+
+    private static native long nativeFillRule(long canvas_ptr, String rule);
+
+    private static native long nativeFillPathRule(long canvas_ptr, long path, String rule);
 
     private static native long nativeFillRect(long canvas_ptr, float x, float y, float width, float height);
 
@@ -44,7 +50,11 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeEllipse(long canvas_ptr, float x, float y, float radiusX, float radiusY, float rotation, float startAngle, float endAngle, boolean anticlockwise);
 
-    private static native long nativeClip(long canvas_ptr, String rule);
+    private static native long nativeClip(long canvas_ptr);
+
+    private static native long nativeClipRule(long canvas_ptr, String rule);
+
+    private static native long nativeClipPathRule(long canvas_ptr, long path, String rule);
 
     private static native long nativeSetLineWidth(long canvas_ptr, float lineWidth);
 
@@ -305,10 +315,9 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
-    Canvas canvas;
 
     private void updateCanvas() {
-        synchronized (CanvasView.lock) {
+        synchronized (canvasView.lock) {
             canvasView.pendingInvalidate = true;
         }
     }
@@ -390,11 +399,51 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
+    public void fill(final String rule) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeFillRule(canvasView.canvas, rule);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void fill(final CanvasPath2D path, final String rule) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeFillPathRule(canvasView.canvas, path.path, rule);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void fill(final CanvasPath2D path) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeFillPathRule(canvasView.canvas, path.path, "nonzero");
+                updateCanvas();
+            }
+        });
+    }
+
     public void stroke() {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeStroke(canvasView.canvas);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void stroke(final CanvasPath2D path) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeStrokePath(canvasView.canvas, path.path);
                 updateCanvas();
             }
         });
@@ -481,15 +530,37 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     }
 
     public void clip() {
-        clip("nonzero");
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeClip(canvasView.canvas);
+            }
+        });
     }
 
     public void clip(final String rule) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeClip(canvasView.canvas, rule);
-                updateCanvas();
+                canvasView.canvas = CanvasRenderingContext2D.nativeClipRule(canvasView.canvas, rule);
+            }
+        });
+    }
+
+    public void clip(final CanvasPath2D path) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeClipPathRule(canvasView.canvas, path.path, "nonzero");
+            }
+        });
+    }
+
+    public void clip(final CanvasPath2D path, final String rule) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeClipPathRule(canvasView.canvas, path.path, rule);
             }
         });
     }
@@ -656,17 +727,24 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
+    private float shadowBlurInternal = 0;
+    private int shadowColorInternal = Color.BLACK;
+    private float shadowOffsetXInternal = 0;
+    private float shadowOffsetYInternal = 0;
+    private String fontInternal = "10px sans-serif";
+
     public void setShadowBlur(final float blur) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowBlur(canvasView.canvas, blur);
+                shadowBlurInternal = blur;
             }
         });
     }
 
     public float getShadowBlur() {
-        return 0;
+        return shadowBlurInternal;
     }
 
     public void setShadowColor(final int color) {
@@ -674,12 +752,13 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowColor(canvasView.canvas, color);
+                shadowColorInternal = color;
             }
         });
     }
 
     public int getShadowColor() {
-        return 0;
+        return shadowColorInternal;
     }
 
     public void setShadowOffsetX(final float x) {
@@ -687,12 +766,13 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowOffsetX(canvasView.canvas, x);
+                shadowOffsetXInternal = x;
             }
         });
     }
 
     public float getShadowOffsetX() {
-        return 0;
+        return shadowOffsetXInternal;
     }
 
     public void setShadowOffsetY(final float y) {
@@ -700,12 +780,13 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowOffsetY(canvasView.canvas, y);
+                shadowOffsetYInternal = y;
             }
         });
     }
 
     public float getShadowOffsetY() {
-        return 0;
+        return shadowOffsetYInternal;
     }
 
     public void setFont(final String font) {
@@ -713,12 +794,13 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetFont(canvasView.canvas, font);
+                fontInternal = font;
             }
         });
     }
 
     public String getFont() {
-        return "";
+        return fontInternal;
     }
 
     public CanvasTextMetrics measureText(String text) {
@@ -801,9 +883,8 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeResetTransform(canvasView.canvas);
+                updateCanvas();
             }
         });
     }
-
-
 }

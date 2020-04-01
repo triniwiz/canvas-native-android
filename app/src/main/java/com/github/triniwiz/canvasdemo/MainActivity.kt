@@ -2,34 +2,24 @@ package com.github.triniwiz.canvasdemo
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
-import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.StrictMode
 import android.util.Log
 import android.view.View
-import java.net.URL
-import android.graphics.BitmapFactory
-import android.os.*
-import android.view.Choreographer
-import android.view.ViewGroup
-import androidx.constraintlayout.widget.ConstraintLayout
-import androidx.core.os.postDelayed
-import androidx.core.view.postDelayed
+import androidx.appcompat.app.AppCompatActivity
 import com.github.triniwiz.canvas.*
-import kotlinx.android.synthetic.main.activity_main.*
-import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.URL
 import java.util.*
-import kotlin.collections.ArrayList
-import kotlin.concurrent.schedule
-import kotlin.reflect.KFunction2
-import java.util.Collections.rotate
-import kotlin.math.*
-import androidx.core.os.HandlerCompat.postDelayed
-import java.lang.System.console
-
-
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
 
 
 class MainActivity : AppCompatActivity() {
@@ -43,8 +33,13 @@ class MainActivity : AppCompatActivity() {
         init()
     }
 
-    override fun onResume() {
-        super.onResume()
+    override fun onStop() {
+        super.onStop()
+        canvas?.onPause()
+    }
+    override fun onStart() {
+        super.onStart()
+        canvas?.onResume()
     }
 
 
@@ -55,7 +50,12 @@ class MainActivity : AppCompatActivity() {
     var p2 = KeyValue(150f, 50f);
     var p3 = KeyValue(200f, 100f);
 
-    private fun textPoint(ctx: CanvasRenderingContext2D, p: KeyValue, offset: KeyValue, i: Int = 0) {
+    private fun textPoint(
+        ctx: CanvasRenderingContext2D,
+        p: KeyValue,
+        offset: KeyValue,
+        i: Int = 0
+    ) {
         val x = offset.x
         val y = offset.y
         ctx.beginPath()
@@ -164,11 +164,23 @@ class MainActivity : AppCompatActivity() {
                     }
                     // draw additional image1
                     if (x > 0) {
-                        ctx.drawImage(img, (-imgW + x).toFloat(), y.toFloat(), imgW.toFloat(), imgH.toFloat());
+                        ctx.drawImage(
+                            img,
+                            (-imgW + x).toFloat(),
+                            y.toFloat(),
+                            imgW.toFloat(),
+                            imgH.toFloat()
+                        );
                     }
                     // draw additional image2
                     if (x - imgW > 0) {
-                        ctx.drawImage(img, (-imgW * 2 + x).toFloat(), y.toFloat(), imgW.toFloat(), imgH.toFloat());
+                        ctx.drawImage(
+                            img,
+                            (-imgW * 2 + x).toFloat(),
+                            y.toFloat(),
+                            imgW.toFloat(),
+                            imgH.toFloat()
+                        );
                     }
                 }
 
@@ -180,7 +192,13 @@ class MainActivity : AppCompatActivity() {
                     }
                     // draw aditional image
                     if (x > (CanvasXSize - imgW)) {
-                        ctx.drawImage(img, (x - imgW + 1).toFloat(), y.toFloat(), imgW.toFloat(), imgH.toFloat());
+                        ctx.drawImage(
+                            img,
+                            (x - imgW + 1).toFloat(),
+                            y.toFloat(),
+                            imgW.toFloat(),
+                            imgH.toFloat()
+                        );
                     }
                 }
                 // draw image
@@ -204,7 +222,8 @@ class MainActivity : AppCompatActivity() {
                 img = BitmapFactory.decodeFile(file.absolutePath)
                 Log.d("com.github", "w " + img?.width + " H " + img?.height)
             } else {
-                val url = URL("https://mdn.mozillademos.org/files/4553/Capitan_Meadows,_Yosemite_National_Park.jpg")
+                val url =
+                    URL("https://mdn.mozillademos.org/files/4553/Capitan_Meadows,_Yosemite_National_Park.jpg")
                 val fs = FileOutputStream(file)
                 url.openStream().use { input ->
                     fs.use { output ->
@@ -304,12 +323,8 @@ class MainActivity : AppCompatActivity() {
             ctx.globalCompositeOperation = CanvasCompositeOperationType.DestinationOver
             ctx.clearRect(0F, 0F, 300F, 300F) // clear canvas
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ctx.fillStyle = CanvasColorStyle.Color(Color.argb(0.4F, 0.0F, 0.0F, 0.0F))
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                ctx.strokeStyle = CanvasColorStyle.Color(Color.argb(0.4F, 0.0F, (153 / 255).toFloat(), 1.0F))
-            }
+            ctx.fillStyle = CanvasColorStyle.Color("rgba(0, 0, 0, 0.4)")
+            ctx.strokeStyle = CanvasColorStyle.Color("rgba(0, 153, 255, 0.4)")
             ctx.save()
             ctx.translate(150F, 150F)
 
@@ -342,25 +357,22 @@ class MainActivity : AppCompatActivity() {
             }
 
         } catch (e: IOException) {
-
+            e.printStackTrace()
         }
     }
 
 
     fun loop(ctx: CanvasRenderingContext2D, t: Long) {
-        t0 = t/ 1000.0
+        t0 = t / 1000.0
         a = t0 % PI2
-        rr = abs(cos(a) * r);
-        Log.d("com.test", "time " + t + " a " + a + " rr " + rr)
+        rr = abs(cos(a) * r)
         ctx.clearRect(0f, 0f, ctx.canvas.width.toFloat(), ctx.canvas.height.toFloat());
         val points = arrayOf(p1, p2, p3)
         drawArc(ctx, points, rr.toFloat())
         drawPoints(ctx, points)
 
         AnimationFrame.requestAnimationFrame { called ->
-            run {
-                loop(ctx, called)
-            }
+            loop(ctx, called)
         }
     }
 
@@ -457,6 +469,17 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+    fun faceLoop(ctx: CanvasRenderingContext2D) {
+        ctx.fillStyle = CanvasColorStyle.Color("white")
+        ctx.fillRect(0f, 0f, ctx.canvas.width.toFloat(), ctx.canvas.height.toFloat())
+        ctx.fillStyle = CanvasColorStyle.Color("black")
+        drawFace(ctx)
+        AnimationFrame.requestAnimationFrame {
+            faceLoop(ctx)
+        }
+    }
+
+    @SuppressLint("NewApi")
     fun drawFill(view: View) {
         ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
         /* ctx?.fillStyle = CanvasColorStyle.Color(Color.BLUE)
@@ -467,9 +490,47 @@ class MainActivity : AppCompatActivity() {
              ctx?.fillStyle = CanvasColorStyle.Color(Color.BLACK)
              drawImageExample(ctx!!)
          },null,4000)*/
-        //drawHouse(ctx!!)
-        //drawSVG(svgView!!)
         drawHouse(ctx!!)
+        //drawSVG(svgView!!)
+      //  drawHouse(ctx!!)
+        /*canvasView.toDataURLAsync {
+            Log.d("com.test", "aaaa: " + it)
+        }
+        canvasView.toDataURLAsync {
+            Log.d("com.test", "bbbb: " + it)
+        }
+        canvasView.toDataURLAsync {
+            Log.d("com.test", "cccc: " + it)
+        }
+        canvasView.toDataURLAsync {
+            Log.d("com.test", "dddd: " + it)
+        }*/
+
+       // drawImageExample(ctx!!)
+        // drawImageSmoothingEnabled(ctx!!)
+       /// draw(ctx!!)
+
+        // Create clipping path
+        // Create clipping path
+
+
+//solarAnimation(ctx!!)
+      // draw(ctx!!)
+
+       // canvas?.flush()
+
+      //  loop(ctx!!,0)
+        /*val data = canvas!!.toDataURL();
+        Log.d("com.test", "url: " + data)
+
+        //drawImageExample(ctx!!)
+       // val data = canvas!!.toData()
+        //Log.d("com.test", "stfff: " + data)
+        val file = File(applicationContext.filesDir,"base64.txt")
+        val fos = FileOutputStream(file)
+        fos.write(data.toByteArray(StandardCharsets.UTF_8))
+        fos.close()
+        */
 
     }
 
@@ -525,12 +586,11 @@ class MainActivity : AppCompatActivity() {
     fun draw(ctx: CanvasRenderingContext2D) {
         var s = resources.displayMetrics.density
         var canvas = ctx.canvas
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            ctx.fillStyle = CanvasColorStyle.Color(Color.argb(0.3f, 1.0f, 1.0f, 1.0f))
-        }
+        //ctx.fillStyle = CanvasColorStyle.Color("rgba(255,255,255,0.3)")
         var width = canvas.width
         var height = canvas.height
-        ctx.fillRect(0f, 0f, width.toFloat(), height.toFloat())
+       // ctx.fillRect(0f, 0f, width.toFloat(), height.toFloat())
+        ctx.clearRect(0f,0f, canvas.width.toFloat(), canvas.height.toFloat());
         ball.draw(ctx)
         ball.x += ball.vx;
         ball.y += ball.vy;
@@ -548,10 +608,9 @@ class MainActivity : AppCompatActivity() {
             ball.vx = -ball.vx;
         }
 
+
         AnimationFrame.requestAnimationFrame { called ->
-            run {
-                draw(ctx)
-            }
+            draw(ctx)
         }
     }
 
@@ -559,9 +618,7 @@ class MainActivity : AppCompatActivity() {
 
     fun ballExample(ctx: CanvasRenderingContext2D) {
         AnimationFrame.requestAnimationFrame { called ->
-            run {
-                draw(ctx)
-            }
+            draw(ctx)
         }
     }
 
@@ -618,7 +675,8 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
                 StrictMode.setThreadPolicy(policy)
-                val url = URL("https://interactive-examples.mdn.mozilla.net/media/examples/star.png")
+                val url =
+                    URL("https://interactive-examples.mdn.mozilla.net/media/examples/star.png")
                 val fs = FileOutputStream(file)
                 url.openStream().use { input ->
                     fs.use { output ->
@@ -657,7 +715,8 @@ class MainActivity : AppCompatActivity() {
             } else {
                 val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
                 StrictMode.setThreadPolicy(policy)
-                val url = URL("https://mdn.mozillademos.org/files/5397/rhino.jpg")
+                val url =
+                    URL("https://images.unsplash.com/photo-1455098934982-64c622c5e066") // URL("https://mdn.mozillademos.org/files/5397/rhino.jpg")
                 val fs = FileOutputStream(file)
                 url.openStream().use { input ->
                     fs.use { output ->
@@ -669,7 +728,7 @@ class MainActivity : AppCompatActivity() {
             }
 
         } catch (e: IOException) {
-
+            e.printStackTrace()
         }
     }
 

@@ -1,5 +1,6 @@
 package com.github.triniwiz.canvas;
 
+import android.animation.TimeAnimator;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Looper;
@@ -10,6 +11,7 @@ import android.view.Choreographer;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Created by triniwiz on 2019-08-13
@@ -22,6 +24,8 @@ public class AnimationFrame implements Choreographer.FrameCallback {
     static AnimationFrame instance;
     static HandlerThread handlerThread;
     static Handler handler;
+    static final Object lock = new Object();
+    static Choreographer choreographer;
 
     static {
         callbacks = new ConcurrentHashMap<>();
@@ -33,12 +37,13 @@ public class AnimationFrame implements Choreographer.FrameCallback {
 
     @Override
     public void doFrame(long frameTimeNanos) {
-        final long dt = frameTimeNanos - lastCall;
+        final long dt = TimeUnit.NANOSECONDS.toMillis(frameTimeNanos - lastCall);
         handler.post(new Runnable() {
             @Override
             public void run() {
-                for (final Map.Entry<String, Callback> callback : callbacks.entrySet()) {
-                    callback.getValue().onFrame(dt / 1000);
+                Set<Map.Entry<String, Callback>> set = callbacks.entrySet();
+                for (final Map.Entry<String, Callback> callback : set) {
+                    callback.getValue().onFrame(dt);
                     if (!callback.getKey().equals("main")) {
                         callbacks.remove(callback.getKey());
                     }
@@ -46,7 +51,7 @@ public class AnimationFrame implements Choreographer.FrameCallback {
             }
         });
         lastCall = frameTimeNanos;
-        Choreographer.getInstance().postFrameCallbackDelayed(instance, dt);
+        Choreographer.getInstance().postFrameCallbackDelayed(instance, TimeUnit.MILLISECONDS.toNanos(dt));
     }
 
     public interface Callback {
@@ -56,7 +61,9 @@ public class AnimationFrame implements Choreographer.FrameCallback {
     public static String requestAnimationFrame(Callback callback) {
         String id = UUID.randomUUID().toString();
         callbacks.put(id, callback);
-        Choreographer.getInstance().postFrameCallback(instance);
+        if (choreographer == null) {
+            Choreographer.getInstance().postFrameCallback(instance);
+        }
         return id;
     }
 
@@ -68,6 +75,7 @@ public class AnimationFrame implements Choreographer.FrameCallback {
         callbacks.remove(id);
         if (callbacks.isEmpty()) {
             Choreographer.getInstance().removeFrameCallback(instance);
+            choreographer = null;
         }
     }
 }
