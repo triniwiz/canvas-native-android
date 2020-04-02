@@ -1,6 +1,8 @@
 package com.github.triniwiz.canvas;
 
+import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.Application;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
 import android.graphics.Color;
@@ -9,6 +11,7 @@ import android.graphics.drawable.ColorDrawable;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -21,6 +24,7 @@ import android.view.SurfaceHolder;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
@@ -31,7 +35,7 @@ import javax.microedition.khronos.opengles.GL10;
 /**
  * Created by triniwiz on 3/29/20
  */
-public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, Choreographer.FrameCallback, SurfaceHolder.Callback {
+public class CanvasView extends FrameLayout implements GLTextureView.Renderer, Choreographer.FrameCallback, SurfaceHolder.Callback, Application.ActivityLifecycleCallbacks {
 
     private static native long nativeInit(long canvas_ptr, int id, int width, int height, float scale);
 
@@ -52,7 +56,7 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
     private HandlerThread handlerThread = new HandlerThread("CanvasViewThread");
     private Handler handler;
 
-    private GLSurfaceView glSurfaceView;
+    private GLTextureView glSurfaceView;
     private boolean handleInvalidationManually = false;
     long canvas = 0;
     CanvasRenderingContext renderingContext2d = null;
@@ -67,21 +71,18 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
     static long lastCall = 0;
 
     void clear() {
-        GLES20.glClearColor(1F, 1F, 1F, 1F);
-        GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_STENCIL_BUFFER_BIT);
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
     }
 
     @Override
     public void doFrame(long frameTimeNanos) {
         if (!handleInvalidationManually) {
             final long dt = TimeUnit.NANOSECONDS.toMillis(frameTimeNanos - lastCall);
-            handler.post(new Runnable() {
+            queueEvent(new Runnable() {
                 @Override
                 public void run() {
-                    synchronized (lock) {
-                        if (pendingInvalidate) {
-                            flush();
-                        }
+                    if (pendingInvalidate) {
+                        flush();
                     }
                 }
             });
@@ -105,7 +106,7 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
             System.loadLibrary("canvasnative");
             isLibraryLoaded = true;
         }
-        glSurfaceView = new GLSurfaceView(context, attrs);
+        glSurfaceView = new GLTextureView(context, attrs);
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
         mainHandler = new Handler(Looper.getMainLooper());
@@ -113,20 +114,22 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
         scale = context.getResources().getDisplayMetrics().density;
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 24, 8);
         if (detectOpenGLES30() && !isEmulator()) {
-            glSurfaceView.setEGLContextClientVersion(3);
+           glSurfaceView.setEGLContextClientVersion(3);
         } else {
-            glSurfaceView.setEGLContextClientVersion(2);
+           glSurfaceView.setEGLContextClientVersion(2);
         }
-        glSurfaceView.setPreserveEGLContextOnPause(true);
-        glSurfaceView.getHolder().addCallback(this);
-        glSurfaceView.getHolder().setFormat(PixelFormat.TRANSLUCENT);
+
+       glSurfaceView.setPreserveEGLContextOnPause(true);
         glSurfaceView.setRenderer(this);
-        glSurfaceView.setRenderMode(GLSurfaceView.RENDERMODE_WHEN_DIRTY);
-        glSurfaceView.setZOrderOnTop(false);
+       // glSurfaceView.getHolder().addCallback(this);
+       //glSurfaceView.getHolder().setFormat(PixelFormat.TRANSPARENT);
+        glSurfaceView.setRenderMode(GLTextureView.RENDERMODE_WHEN_DIRTY);
+        //glSurfaceView.setZOrderOnTop(false);
         glSurfaceView.setLayoutParams(
                 new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         );
-        CanvasView.this.setForeground(new ColorDrawable(Color.WHITE));
+
+        //  CanvasView.this.setForeground(new ColorDrawable(Color.WHITE));
         addView(glSurfaceView);
 
     }
@@ -140,24 +143,10 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
 
     public void onPause() {
         Choreographer.getInstance().removeFrameCallback(this);
-        wasDestroyed = true;
-        if (pendingInvalidate) {
-            wasPendingDraw = true;
-        }
-        pendingInvalidate = false;
-        renderCount = 0;
-        if (glSurfaceView != null) {
-            glSurfaceView.onPause();
-        }
     }
 
     public void onResume() {
         Choreographer.getInstance().postFrameCallback(this);
-        if (wasPendingDraw) {
-            pendingInvalidate = true;
-            wasPendingDraw = false;
-        }
-        glSurfaceView.onResume();
     }
 
     public void destroy() {
@@ -181,7 +170,7 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
         return handleInvalidationManually;
     }
 
-    public GLSurfaceView getSurface() {
+    public GLTextureView getSurface() {
         return glSurfaceView;
     }
 
@@ -189,6 +178,46 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
         if (glSurfaceView != null) {
             glSurfaceView.queueEvent(runnable);
         }
+    }
+
+    public void setupActivityHandler(Application app) {
+        app.unregisterActivityLifecycleCallbacks(this);
+        app.registerActivityLifecycleCallbacks(this);
+    }
+
+    @Override
+    public void onActivityCreated(@NonNull Activity activity, @Nullable Bundle savedInstanceState) {
+
+    }
+
+    @Override
+    public void onActivityStarted(@NonNull Activity activity) {
+
+    }
+
+    @Override
+    public void onActivityResumed(@NonNull Activity activity) {
+        onResume();
+    }
+
+    @Override
+    public void onActivityPaused(@NonNull Activity activity) {
+
+    }
+
+    @Override
+    public void onActivityStopped(@NonNull Activity activity) {
+        onPause();
+    }
+
+    @Override
+    public void onActivitySaveInstanceState(@NonNull Activity activity, @NonNull Bundle outState) {
+
+    }
+
+    @Override
+    public void onActivityDestroyed(@NonNull Activity activity) {
+
     }
 
     public interface DataURLListener {
@@ -326,11 +355,8 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
 
     @Override
     public void onDrawFrame(GL10 gl) {
-        synchronized (lock) {
-            if (!wasDestroyed) {
-                clear();
-            }
             if (canvas == 0) {
+               GLES20.glClearColor(1F, 1F, 1F, 1F);
                 lastSize = newSize;
                 int[] frameBuffers = new int[1];
                 GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
@@ -347,20 +373,12 @@ public class CanvasView extends FrameLayout implements GLSurfaceView.Renderer, C
             if (renderCount < 3) {
                 renderCount++;
             }
-            if (!wasDestroyed || !pendingInvalidate) {
+            if (pendingInvalidate) {
+               // clear();
                 canvas = nativeFlush(canvas);
+                pendingInvalidate = false;
             }
 
-            pendingInvalidate = false;
-            if (renderCount == 1 && wasDestroyed) {
-                wasDestroyed = false;
-                hideForeground();
-            }
-            if (renderCount == 3) {
-                hideForeground();
-            }
-            wasDestroyed = false;
-        }
     }
 
 
