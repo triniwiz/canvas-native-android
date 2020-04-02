@@ -1,7 +1,5 @@
 package com.github.triniwiz.canvas;
 
-import android.util.Log;
-
 /**
  * Created by triniwiz on 3/27/20
  */

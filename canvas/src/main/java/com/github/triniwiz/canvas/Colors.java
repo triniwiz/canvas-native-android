@@ -1,7 +1,6 @@
 package com.github.triniwiz.canvas;
 
 import android.graphics.Color;
-import android.util.Log;
 
 import java.util.HashMap;
 
