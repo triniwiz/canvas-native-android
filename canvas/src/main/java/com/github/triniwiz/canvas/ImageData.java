@@ -25,4 +25,10 @@ public class ImageData {
     public byte[] getData() {
         return data;
     }
+
+    public void updateData(byte[] data) {
+        this.data = null;
+        this.data = data;
+    }
+
 }
