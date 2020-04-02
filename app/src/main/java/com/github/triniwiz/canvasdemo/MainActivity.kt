@@ -33,16 +33,6 @@ class MainActivity : AppCompatActivity() {
         init()
     }
 
-    override fun onStop() {
-        super.onStop()
-        canvas?.onPause()
-    }
-    override fun onStart() {
-        super.onStart()
-        canvas?.onResume()
-    }
-
-
     var r = 100f; // Radius
     var p0 = KeyValue(0f, 50f);
 
@@ -490,7 +480,7 @@ class MainActivity : AppCompatActivity() {
              ctx?.fillStyle = CanvasColorStyle.Color(Color.BLACK)
              drawImageExample(ctx!!)
          },null,4000)*/
-        drawHouse(ctx!!)
+       // drawHouse(ctx!!)
         //drawSVG(svgView!!)
       //  drawHouse(ctx!!)
         /*canvasView.toDataURLAsync {
@@ -508,7 +498,7 @@ class MainActivity : AppCompatActivity() {
 
        // drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
-       /// draw(ctx!!)
+        draw(ctx!!)
 
         // Create clipping path
         // Create clipping path
