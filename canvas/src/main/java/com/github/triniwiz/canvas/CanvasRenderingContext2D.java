@@ -60,6 +60,8 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeSetGlobalCompositeOperation(long canvas_ptr, String composite);
 
+    private static native long nativeSetGlobalAlpha(long canvas_ptr, int alpha);
+
     private static native long nativeSetTextAlignment(long canvas_ptr, String alignment);
 
     private static native long nativeSave(long canvas_ptr);
@@ -110,6 +112,8 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeSetLineCap(long canvas, String toString);
 
+    private static native long nativeSetLineJoin(long canvas, String toString);
+
     private static native long nativeSetFillGradientRadial(long canvas, float x0, float y0, float r0, float x1, float y1, float r1, int[] rawValues, float[] rawKeys);
 
     private static native long nativeSetFillGradientLinear(long canvas, float x0, float y0, float x1, float y1, int[] rawValues, float[] rawKeys);
@@ -123,6 +127,8 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     private static native long nativeSetLineDash(long canvas, float[] dash);
 
     private static native long nativeResetTransform(long canvas);
+
+    private static native long nativeSetMiterLimit(long canvas, float limit);
 
     private static native CanvasTextMetrics nativeMeasureText(long canvas, String text);
 
@@ -145,6 +151,22 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         @Override
         public String toString() {
             return lineCap;
+        }
+    }
+
+    public enum LineJoin {
+        Bevel("bevel"),
+        Round("round"),
+        Miter("miter");
+        private String lineJoin;
+
+        LineJoin(String lineJoin) {
+            this.lineJoin = lineJoin;
+        }
+
+        @Override
+        public String toString() {
+            return lineJoin;
         }
     }
 
@@ -173,10 +195,12 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     private ICanvasColorStyle strokeStyle = new CanvasColorStyle.Color(Color.BLACK);
     private CanvasCompositeOperationType globalCompositeOperation = CanvasCompositeOperationType.SourceOver;
     private CanvasTextAlignment textAlign = CanvasTextAlignment.Start;
-    float globalAlpha = 1;
+    private float globalAlpha = 1;
     String font = "10px sans-serif";
-    LineCap lineCap = LineCap.Butt;
-    float lineDashOffset = 0f;
+    private LineCap lineCap = LineCap.Butt;
+    private LineJoin lineJoin = LineJoin.Miter;
+    private float lineDashOffset = 0f;
+    private float miterLimit = 10;
 
     public ICanvasColorStyle getFillStyle() {
         return fillStyle;
@@ -254,6 +278,47 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
+    public LineCap getLineCap() {
+        return lineCap;
+    }
+
+    private void setLineJoinInternal(final LineJoin lineJoin) {
+        this.lineJoin = lineJoin;
+    }
+
+    public void setLineJoin(final LineJoin lineJoin) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineJoin(canvasView.canvas, lineJoin.toString());
+                setLineJoinInternal(lineJoin);
+            }
+        });
+    }
+
+    public LineJoin getLineJoin() {
+        return lineJoin;
+    }
+
+    private void setMiterLimitInternal(final float limit) {
+        this.miterLimit = limit;
+    }
+
+    public void setMiterLimit(final float limit) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeSetMiterLimit(canvasView.canvas, limit);
+                setMiterLimitInternal(limit);
+            }
+        });
+    }
+
+    public float getMiterLimit() {
+        return miterLimit;
+    }
+
+
     private void setLineDashOffsetInternal(float offset) {
         this.lineDashOffset = offset;
     }
@@ -317,9 +382,9 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
 
     private void updateCanvas() {
-        synchronized (canvasView.lock) {
-            canvasView.pendingInvalidate = true;
-        }
+        // synchronized (canvasView.lock) {
+        canvasView.pendingInvalidate = true;
+        //}
     }
 
     public void clearRect(final float x, final float y, final float width, final float height) {
@@ -595,6 +660,30 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeSetGlobalCompositeOperation(canvasView.canvas, globalCompositeOperation.type);
                 setGlobalCompositeOperationInternal(globalCompositeOperation);
+            }
+        });
+    }
+
+
+    public float getGlobalAlpha() {
+        return globalAlpha;
+    }
+
+    private void setGlobalAlphaInternal(float alpha) {
+        this.globalAlpha = alpha;
+    }
+
+    public void setGlobalAlpha(float alpha) {
+        if (alpha == 0 || alpha > 1) {
+            alpha = 1;
+        }
+        final int globalAlpha = (int) (alpha * 255);
+        final float finalAlpha = alpha;
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeSetGlobalAlpha(canvasView.canvas, globalAlpha);
+                setGlobalAlphaInternal(finalAlpha);
             }
         });
     }
