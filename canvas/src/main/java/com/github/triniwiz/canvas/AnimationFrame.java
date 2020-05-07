@@ -37,25 +37,28 @@ public class AnimationFrame implements Choreographer.FrameCallback {
 
     @Override
     public void doFrame(long frameTimeNanos) {
-        final long dt = TimeUnit.NANOSECONDS.toMillis(frameTimeNanos - lastCall);
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                Set<Map.Entry<String, Callback>> set = callbacks.entrySet();
-                for (final Map.Entry<String, Callback> callback : set) {
-                    callback.getValue().onFrame(dt);
-                    if (!callback.getKey().equals("main")) {
-                        callbacks.remove(callback.getKey());
+        final long dt = (frameTimeNanos )/ 1000000;
+        if(dt > 0){
+            handler.post(new Runnable() {
+                @Override
+                public void run() {
+                    Set<Map.Entry<String, Callback>> set = callbacks.entrySet();
+                    for (final Map.Entry<String, Callback> callback : set) {
+                        callback.getValue().onFrame(dt);
+                        if (!callback.getKey().equals("main")) {
+                            callbacks.remove(callback.getKey());
+                        }
                     }
                 }
-            }
-        });
+            });
+        }
+        final long delay = frameTimeNanos - lastCall;
         lastCall = frameTimeNanos;
-        Choreographer.getInstance().postFrameCallbackDelayed(instance, TimeUnit.MILLISECONDS.toNanos(dt));
+        Choreographer.getInstance().postFrameCallback(instance);
     }
 
     public interface Callback {
-        void onFrame(long called);
+        void onFrame(float called);
     }
 
     public static String requestAnimationFrame(Callback callback) {

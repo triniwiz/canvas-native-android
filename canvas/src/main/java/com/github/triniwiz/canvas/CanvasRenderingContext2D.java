@@ -82,9 +82,15 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeDrawImage(long canvas, Bitmap image, float dx, float dy);
 
+    private static native long nativeDrawImageRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy);
+
     private static native long nativeDrawImageDw(long canvas, Bitmap image, float dx, float dy, float dWidth, float dHeight);
 
+    private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
+
     private static native long nativeDrawImageSw(long canvas, Bitmap image, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
+
+    private static native long nativeDrawImageSwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeClearRect(long canvas_ptr, float x, float y, float width, float height);
 
@@ -331,6 +337,10 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
                 setLineDashOffset(offset);
             }
         });
+    }
+
+    public float getLineDashOffset(){
+        return lineDashOffset;
     }
 
     private float[] lineDash = new float[0];
@@ -796,6 +806,16 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
+    public void drawImage(final ImageAsset asset, final float dx, final float dy) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy);
+                updateCanvas();
+            }
+        });
+    }
+
     public void drawImage(final Bitmap image, final float dx, final float dy, final float dWidth, final float dHeight) {
         canvasView.queueEvent(new Runnable() {
             @Override
@@ -806,11 +826,31 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
+    public void drawImage(final ImageAsset asset, final float dx, final float dy, final float dWidth, final float dHeight) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageDwRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy, dWidth, dHeight);
+                updateCanvas();
+            }
+        });
+    }
+
     public void drawImage(final Bitmap image, final float sx, final float sy, final float sWidth, final float sHeight, final float dx, final float dy, final float dWidth, final float dHeight) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageSw(canvasView.canvas, image, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void drawImage(final ImageAsset asset, final float sx, final float sy, final float sWidth, final float sHeight, final float dx, final float dy, final float dWidth, final float dHeight) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageSwRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
                 updateCanvas();
             }
         });

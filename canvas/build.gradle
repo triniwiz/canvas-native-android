@@ -10,7 +10,7 @@ buildscript {
 ext {
     PUBLISH_GROUP_ID = 'com.github.triniwiz'
     PUBLISH_ARTIFACT_ID = 'canvas'
-    PUBLISH_VERSION = '0.2.3'
+    PUBLISH_VERSION = '0.3.0'
 }
 
 
@@ -19,17 +19,12 @@ apply plugin: 'com.novoda.bintray-release'
 
 android {
     compileSdkVersion 29
-
-
-
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 17
         targetSdkVersion 29
         versionCode 1
         versionName "1.0"
-
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-
     }
 
     buildTypes {
@@ -42,7 +37,6 @@ android {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
-
     implementation 'androidx.appcompat:appcompat:1.1.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
@@ -53,7 +47,7 @@ publish {
     userOrg = 'triniwiz'
     groupId = 'com.github.triniwiz'
     artifactId = 'canvas'
-    publishVersion = '0.2.3'
+    publishVersion = '0.3.0'
     desc = ''
     website = ''
 }
