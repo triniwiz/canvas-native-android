@@ -1,5 +1,7 @@
 package com.github.triniwiz.canvas;
 
+import android.animation.TimeAnimator;
+import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.Application;
@@ -8,6 +10,7 @@ import android.content.pm.ConfigurationInfo;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
+import android.opengl.EGL14;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Build;
@@ -28,9 +31,18 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import javax.microedition.khronos.egl.EGL;
+import javax.microedition.khronos.egl.EGL10;
+import javax.microedition.khronos.egl.EGLConfig;
+import javax.microedition.khronos.egl.EGLContext;
+import javax.microedition.khronos.egl.EGLDisplay;
+import javax.microedition.khronos.egl.EGLSurface;
 import javax.microedition.khronos.opengles.GL10;
+
 
 /**
  * Created by triniwiz on 3/29/20
@@ -56,7 +68,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     private HandlerThread handlerThread = new HandlerThread("CanvasViewThread");
     private Handler handler;
 
-    private GLTextureView glSurfaceView;
+    GLTextureView glSurfaceView;
     private boolean handleInvalidationManually = false;
     long canvas = 0;
     CanvasRenderingContext renderingContext2d = null;
@@ -73,19 +85,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     void clear() {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
     }
-
     @Override
     public void doFrame(long frameTimeNanos) {
         if (!handleInvalidationManually) {
-            final long dt = TimeUnit.NANOSECONDS.toMillis(frameTimeNanos - lastCall);
-            queueEvent(new Runnable() {
-                @Override
-                public void run() {
-                    if (pendingInvalidate) {
-                        flush();
-                    }
-                }
-            });
+            if (pendingInvalidate) {
+                flush();
+            } 
             lastCall = frameTimeNanos;
         }
         Choreographer.getInstance().postFrameCallback(this);
@@ -96,7 +101,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     }
 
     private static boolean isLibraryLoaded = false;
-
+    int glVersion;
     public CanvasView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         if (isInEditMode()) {
@@ -114,15 +119,13 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         scale = context.getResources().getDisplayMetrics().density;
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 24, 8);
         if (detectOpenGLES30() && !isEmulator()) {
-           glSurfaceView.setEGLContextClientVersion(3);
+            glSurfaceView.setEGLContextClientVersion(3);
         } else {
-           glSurfaceView.setEGLContextClientVersion(2);
+            glSurfaceView.setEGLContextClientVersion(2);
         }
-
-       glSurfaceView.setPreserveEGLContextOnPause(true);
         glSurfaceView.setRenderer(this);
-       // glSurfaceView.getHolder().addCallback(this);
-       //glSurfaceView.getHolder().setFormat(PixelFormat.TRANSPARENT);
+        // glSurfaceView.getHolder().addCallback(this);
+        //glSurfaceView.getHolder().setFormat(PixelFormat.TRANSPARENT);
         glSurfaceView.setRenderMode(GLTextureView.RENDERMODE_WHEN_DIRTY);
         //glSurfaceView.setZOrderOnTop(false);
         glSurfaceView.setLayoutParams(
@@ -131,8 +134,10 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
         //  CanvasView.this.setForeground(new ColorDrawable(Color.WHITE));
         addView(glSurfaceView);
-
     }
+
+
+    static final String TAG = "CanvasView";
 
     private boolean detectOpenGLES30() {
         ActivityManager am =
@@ -255,14 +260,21 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         return toDataURL(type, 0.92f);
     }
 
-    public String toDataURL(String type, float quality) {
+    public String toDataURL(final String type, final float quality) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final String[] data = new String[1];
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                data[0] = nativeToDataUrl(canvas, type, quality);
+                lock.countDown();
+            }
+        });
         try {
-            //Must sleep since the flush is async
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+            lock.await();
+        } catch (InterruptedException ignore) {
         }
-        return nativeToDataUrl(canvas, type, quality);
+        return data[0];
     }
 
 
@@ -270,13 +282,34 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         return new CanvasDOMMatrix();
     }
 
+    WebGLRenderingContext webGLRenderingContext;
+    WebGL2RenderingContext webGL2RenderingContext;
     public @Nullable
     CanvasRenderingContext getContext(String type) {
         if (type.equals("2d")) {
             if (renderingContext2d == null) {
                 renderingContext2d = new CanvasRenderingContext2D(this);
             }
+            isWebGL = false;
             return renderingContext2d;
+        } else if (type.equals("webgl")) {
+            if (webGLRenderingContext == null) {
+                webGLRenderingContext = new WebGLRenderingContext(this);
+            }
+            isWebGL = true;
+            return webGLRenderingContext;
+        }
+        else if (type.equals("webgl2")) {
+            if (webGL2RenderingContext == null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                    webGL2RenderingContext = new WebGL2RenderingContext(this);
+                    isWebGL = true;
+                }else {
+                    isWebGL = false;
+                    return null;
+                }
+            }
+            return webGL2RenderingContext;
         }
         return null;
     }
@@ -318,10 +351,23 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     int mWidth = -1;
     int mHeight = -1;
-
+    int textureId = 0;
     int renderCount = 0;
     boolean wasDestroyed = false;
+    boolean isWebGL = false;
+    static class Size {
+        int width;
+        int height;
+        Size(int width, int height){}
 
+        public int getHeight() {
+            return height;
+        }
+
+        public int getWidth() {
+            return width;
+        }
+    }
     Size lastSize;
     Size newSize;
 
@@ -355,8 +401,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     @Override
     public void onDrawFrame(GL10 gl) {
+        if (renderingContext2d == null && webGLRenderingContext == null) {
+            return;
+        }
+        if (!isWebGL) {
             if (canvas == 0) {
-               GLES20.glClearColor(1F, 1F, 1F, 1F);
+                GLES20.glClearColor(1F, 1F, 1F, 1F);
                 lastSize = newSize;
                 int[] frameBuffers = new int[1];
                 GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
@@ -374,13 +424,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
                 renderCount++;
             }
             if (pendingInvalidate) {
-               // clear();
+                // clear();
                 canvas = nativeFlush(canvas);
                 pendingInvalidate = false;
             }
-
+        }
     }
-
 
     private static int rating = -1;
 
