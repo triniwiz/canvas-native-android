@@ -10,8 +10,7 @@ public enum ImageAssetFormat {
     BMP(3),
     TIFF(4);
     int format;
-
-    ImageAssetFormat(int format) {
+    ImageAssetFormat(int format){
         this.format = format;
     }
 

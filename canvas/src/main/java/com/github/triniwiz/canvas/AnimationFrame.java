@@ -37,8 +37,8 @@ public class AnimationFrame implements Choreographer.FrameCallback {
 
     @Override
     public void doFrame(long frameTimeNanos) {
-        final long dt = (frameTimeNanos) / 1000000;
-        if (dt > 0) {
+        final long dt = (frameTimeNanos )/ 1000000;
+        if(dt > 0){
             handler.post(new Runnable() {
                 @Override
                 public void run() {

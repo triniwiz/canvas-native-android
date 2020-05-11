@@ -19,5 +19,4 @@ public enum CanvasTextBaseline {
     @Override
     public String toString() {
         return baseLine;
-    }
-}
+    }}

@@ -7,12 +7,10 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.view.TextureView;
 import android.view.View;
-
 import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGL11;
 import javax.microedition.khronos.egl.EGLConfig;
@@ -104,8 +102,7 @@ public class GLTextureView extends TextureView
         init();
     }
 
-    @Override
-    protected void finalize() throws Throwable {
+    @Override protected void finalize() throws Throwable {
         try {
             if (glThread != null) {
                 // GLThread may still be running if this view was never
@@ -175,7 +172,7 @@ public class GLTextureView extends TextureView
      * If set to false, the EGL context will be released when the GLTextureView is paused,
      * and recreated when the GLTextureView is resumed.
      * <p>
-     * <p>
+     *
      * The default is false.
      *
      * @param preserveOnPause preserve the EGL context when paused
@@ -448,8 +445,7 @@ public class GLTextureView extends TextureView
      * This method is used as part of the View class and is not normally
      * called or subclassed by clients of GLTextureView.
      */
-    @Override
-    protected void onAttachedToWindow() {
+    @Override protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (LOG_ATTACH_DETACH) {
             Log.d(TAG, "onAttachedToWindow reattach =" + detached);
@@ -473,8 +469,7 @@ public class GLTextureView extends TextureView
      * called or subclassed by clients of GLTextureView.
      * Must not be called before a renderer has been set.
      */
-    @Override
-    protected void onDetachedFromWindow() {
+    @Override protected void onDetachedFromWindow() {
         if (LOG_ATTACH_DETACH) {
             Log.d(TAG, "onDetachedFromWindow");
         }
@@ -522,7 +517,7 @@ public class GLTextureView extends TextureView
     }
 
     public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-        if (getRenderMode() == RENDERMODE_CONTINUOUSLY) {
+        if(getRenderMode() == RENDERMODE_CONTINUOUSLY){
             requestRender();
         }
         for (SurfaceTextureListener l : surfaceTextureListeners) {
@@ -621,10 +616,10 @@ public class GLTextureView extends TextureView
          * manually delete these lost resources.
          * <p>
          *
-         * @param gl     the GL interface. Use <code>instanceof</code> to
-         *               test if the interface supports GL11 or higher interfaces.
+         * @param gl the GL interface. Use <code>instanceof</code> to
+         * test if the interface supports GL11 or higher interfaces.
          * @param config the EGLConfig of the created surface. Can be used
-         *               to create matching pbuffers.
+         * to create matching pbuffers.
          */
         void onSurfaceCreated(GL10 gl, EGLConfig config);
 
@@ -648,7 +643,7 @@ public class GLTextureView extends TextureView
          * </pre>
          *
          * @param gl the GL interface. Use <code>instanceof</code> to
-         *           test if the interface supports GL11 or higher interfaces.
+         * test if the interface supports GL11 or higher interfaces.
          */
         void onSurfaceChanged(GL10 gl, int width, int height);
 
@@ -666,7 +661,7 @@ public class GLTextureView extends TextureView
          * </pre>
          *
          * @param gl the GL interface. Use <code>instanceof</code> to
-         *           test if the interface supports GL11 or higher interfaces.
+         * test if the interface supports GL11 or higher interfaces.
          */
         void onDrawFrame(GL10 gl);
     }
@@ -760,7 +755,7 @@ public class GLTextureView extends TextureView
          * {@link EGL10#eglChooseConfig} and iterating through the results. Please consult the
          * EGL specification available from The Khronos Group to learn how to call eglChooseConfig.
          *
-         * @param egl     the EGL10 for the current display.
+         * @param egl the EGL10 for the current display.
          * @param display the current display.
          * @return the chosen configuration.
          */
@@ -823,7 +818,7 @@ public class GLTextureView extends TextureView
     private class ComponentSizeChooser extends BaseConfigChooser {
         public ComponentSizeChooser(int redSize, int greenSize, int blueSize, int alphaSize,
                                     int depthSize, int stencilSize) {
-            super(new int[]{
+            super(new int[] {
                     EGL10.EGL_RED_SIZE, redSize, EGL10.EGL_GREEN_SIZE, greenSize, EGL10.EGL_BLUE_SIZE,
                     blueSize, EGL10.EGL_ALPHA_SIZE, alphaSize, EGL10.EGL_DEPTH_SIZE, depthSize,
                     EGL10.EGL_STENCIL_SIZE, stencilSize, EGL10.EGL_NONE
@@ -837,8 +832,7 @@ public class GLTextureView extends TextureView
             this.stencilSize = stencilSize;
         }
 
-        @Override
-        public EGLConfig chooseConfig(EGL10 egl, EGLDisplay display, EGLConfig[] configs) {
+        @Override public EGLConfig chooseConfig(EGL10 egl, EGLDisplay display, EGLConfig[] configs) {
             for (EGLConfig config : configs) {
                 int d = findConfigAttrib(egl, display, config, EGL10.EGL_DEPTH_SIZE, 0);
                 int s = findConfigAttrib(egl, display, config, EGL10.EGL_STENCIL_SIZE, 0);
@@ -1118,7 +1112,7 @@ public class GLTextureView extends TextureView
      * A generic GL Thread. Takes care of initializing EGL and GL. Delegates
      * to a Renderer instance to do the actual drawing. Can be configured to
      * render continuously or on request.
-     * <p>
+     *
      * All potentially blocking synchronization is done through the
      * glThreadManager object. This avoids multiple-lock ordering issues.
      */
@@ -1132,8 +1126,7 @@ public class GLTextureView extends TextureView
             this.glTextureViewWeakRef = glTextureViewWeakRef;
         }
 
-        @Override
-        public void run() {
+        @Override public void run() {
             setName("GLThread " + getId());
             if (LOG_THREADS) {
                 Log.i("GLThread", "starting tid=" + getId());
@@ -1653,18 +1646,15 @@ public class GLTextureView extends TextureView
 
     static class LogWriter extends Writer {
 
-        @Override
-        public void close() {
+        @Override public void close() {
             flushBuilder();
         }
 
-        @Override
-        public void flush() {
+        @Override public void flush() {
             flushBuilder();
         }
 
-        @Override
-        public void write(char[] buf, int offset, int count) {
+        @Override public void write(char[] buf, int offset, int count) {
             for (int i = 0; i < count; i++) {
                 char c = buf[offset + i];
                 if (c == '\n') {

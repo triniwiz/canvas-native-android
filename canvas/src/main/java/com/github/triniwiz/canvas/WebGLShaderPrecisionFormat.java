@@ -7,9 +7,7 @@ public class WebGLShaderPrecisionFormat {
     int rangeMin = 0;
     int rangeMax = 0;
     int precision = 0;
-
-    public WebGLShaderPrecisionFormat() {
-    }
+    public WebGLShaderPrecisionFormat() {}
 
     public WebGLShaderPrecisionFormat(int rangeMin, int rangeMax, int precision) {
         this.rangeMin = rangeMin;

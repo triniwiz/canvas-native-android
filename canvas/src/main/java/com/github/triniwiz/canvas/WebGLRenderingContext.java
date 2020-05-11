@@ -2,11 +2,14 @@ package com.github.triniwiz.canvas;
 
 import android.graphics.Bitmap;
 import android.opengl.GLES20;
+import android.opengl.GLES30;
 import android.opengl.GLUtils;
 import android.os.Build;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import com.github.triniwiz.canvas.extensions.ANGLE_instanced_arrays;
 import com.github.triniwiz.canvas.extensions.EXT_blend_minmax;
 import com.github.triniwiz.canvas.extensions.EXT_color_buffer_half_float;
 import com.github.triniwiz.canvas.extensions.EXT_disjoint_timer_query;
@@ -26,11 +29,14 @@ import com.github.triniwiz.canvas.extensions.WEBGL_compressed_texture_etc;
 import com.github.triniwiz.canvas.extensions.WEBGL_compressed_texture_etc1;
 import com.github.triniwiz.canvas.extensions.WEBGL_compressed_texture_pvrtc;
 import com.github.triniwiz.canvas.extensions.WEBGL_compressed_texture_s3tc;
+import com.github.triniwiz.canvas.extensions.WEBGL_depth_texture;
+import com.github.triniwiz.canvas.extensions.WEBGL_draw_buffers;
 import com.github.triniwiz.canvas.extensions.WEBGL_lose_context;
 
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.nio.LongBuffer;
 import java.nio.ShortBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -57,10 +63,13 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
 
     native void nativeFlipInPlace(byte[] storage, int width, int height);
 
+    native void nativeGetVertexAttribOffset(int index, int pname, LongBuffer buffer);
+
+    native void nativeBindBuffer(int target, int buffer);
+
     public WebGLRenderingContext(CanvasView canvas) {
         this.canvas = canvas;
         this.depthMask(true);
-
     }
 
     public WebGLRenderingContext(CanvasView canvas, Map<String, Object> attrs) {
@@ -143,7 +152,8 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                GLES20.glBindBuffer(target, buffer);
+                // GLES20.glBindBuffer(target, buffer);
+                nativeBindBuffer(target, buffer);
                 lock.countDown();
             }
         });
@@ -158,7 +168,8 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                GLES20.glBindBuffer(target, 0);
+                // GLES20.glBindBuffer(target, 0);
+                nativeBindBuffer(target, 0);
                 lock.countDown();
             }
         });
@@ -1012,7 +1023,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     GLES30.glDrawArraysInstanced(mode, first, count, 1);
-                } else {
+                }else {
                     GLES20.glDrawArrays(mode, first, count);
                 }
 
@@ -1032,7 +1043,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     GLES30.glDrawElementsInstanced(mode, count, type, offset, 1);
-                } else {
+                }else {
                     GLES20.glDrawElements(mode, count, type, offset);
                 }
 
@@ -1181,8 +1192,8 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
                 GLES20.glGetActiveAttrib(program, index, length.get(0), null, 0, size, 0, type, 0, name, 0);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     info.name = new String(name, StandardCharsets.UTF_8);
-                }else {
-                    info.name = new String(name,Charset.forName("UTF-8"));
+                } else {
+                    info.name = new String(name, Charset.forName("UTF-8"));
                 }
                 info.size = size[0];
                 info.type = type[0];
@@ -1211,7 +1222,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
                 GLES20.glGetActiveUniform(program, index, length.get(0), null, 0, size, 0, type, 0, name, 0);
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     info.name = new String(name, StandardCharsets.UTF_8);
-                }else {
+                } else {
                     info.name = new String(name, Charset.forName("UTF-8"));
                 }
                 info.size = size[0];
@@ -1336,36 +1347,44 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             @Override
             public void run() {
                 String extensions = GLES20.glGetString(GLES20.GL_EXTENSIONS);
-                if (name.equals("EXT_blend_minmax") && extensions.contains("EXT_blend_minmax")) {
+                if (name.equals("EXT_blend_minmax") && extensions.contains("GL_EXT_blend_minmax")) {
                     value[0] = new EXT_blend_minmax();
-                } else if (name.equals("EXT_color_buffer_half_float") && extensions.contains("EXT_color_buffer_half_float")) {
+                } else if (name.equals("EXT_color_buffer_half_float") && extensions.contains("GL_EXT_color_buffer_half_float")) {
                     value[0] = new EXT_color_buffer_half_float();
-                } else if (name.equals("EXT_disjoint_timer_query") && extensions.contains("EXT_disjoint_timer_query")) {
-                    value[0] = new EXT_disjoint_timer_query();
-                } else if (name.equals("EXT_sRGB") && extensions.contains("EXT_sRGB")) {
-                    value[0] = new EXT_sRGB();
-                } else if (name.equals("EXT_shader_texture_lod") && extensions.contains("EXT_shader_texture_lod")) {
-                    value[0] = new EXT_shader_texture_lod();
-                } else if (name.equals("EXT_texture_filter_anisotropic") && extensions.contains("EXT_texture_filter_anisotropic")) {
-                    value[0] = new EXT_texture_filter_anisotropic();
-                } else if (name.equals("OES_element_index_uint") && extensions.contains("OES_element_index_uint")) {
-                    value[0] = new OES_element_index_uint();
-                } else if (name.equals("OES_standard_derivatives") && extensions.contains("OES_standard_derivatives")) {
-                    value[0] = new OES_standard_derivatives();
-                } else if (name.equals("OES_texture_float") && extensions.contains("OES_texture_float")) {
-                    value[0] = new OES_texture_float();
-                } else if (name.equals("OES_texture_float_linear") && extensions.contains("OES_texture_float_linear")) {
-                    value[0] = new OES_texture_float_linear();
-                } else if (name.equals("OES_texture_half_float") && extensions.contains("OES_texture_half_float")) {
-                    value[0] = new OES_texture_half_float();
-                } else if (name.equals("OES_texture_half_float_linear") && extensions.contains("OES_texture_half_float_linear")) {
-                    value[0] = new OES_texture_half_float_linear();
-                } else if (name.equals("OES_vertex_array_object") && extensions.contains("OES_vertex_array_object")) {
-                    value[0] = new OES_vertex_array_object();
-                } else if (name.contains("WEBGL_color_buffer_float")) {
-                    if (canvas.glVersion > 2 || extensions.contains("GL_OES_packed_depth_stencil")) {
-                        value[0] = new WEBGL_color_buffer_float();
+                } else if (name.equals("EXT_disjoint_timer_query") && extensions.contains("GL_EXT_disjoint_timer_query")) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        value[0] = new EXT_disjoint_timer_query(canvas);
+                    } else {
+                        value[0] = null;
                     }
+                } else if (name.equals("EXT_sRGB") && extensions.contains("GL_EXT_sRGB")) {
+                    value[0] = new EXT_sRGB();
+                } else if (name.equals("EXT_shader_texture_lod")) {
+                    if (extensions.contains("GL_EXT_shader_texture_lod")) {
+                        value[0] = new EXT_shader_texture_lod();
+                    }
+                } else if (name.equals("EXT_texture_filter_anisotropic") && extensions.contains("GL_EXT_texture_filter_anisotropic")) {
+                    value[0] = new EXT_texture_filter_anisotropic();
+                } else if (name.equals("OES_element_index_uint") && extensions.contains("GL_OES_element_index_uint")) {
+                    value[0] = new OES_element_index_uint();
+                } else if (name.equals("OES_standard_derivatives") && extensions.contains("GL_OES_standard_derivatives")) {
+                    value[0] = new OES_standard_derivatives();
+                } else if (name.equals("OES_texture_float") && extensions.contains("GL_OES_texture_float")) {
+                    value[0] = new OES_texture_float();
+                } else if (name.equals("OES_texture_float_linear") && extensions.contains("GL_OES_texture_float_linear")) {
+                    value[0] = new OES_texture_float_linear();
+                } else if (name.equals("OES_texture_half_float") && extensions.contains("GL_OES_texture_half_float")) {
+                    value[0] = new OES_texture_half_float();
+                } else if (name.equals("OES_texture_half_float_linear") && extensions.contains("GL_OES_texture_half_float_linear")) {
+                    value[0] = new OES_texture_half_float_linear();
+                } else if (name.equals("OES_vertex_array_object") && extensions.contains("GL_OES_vertex_array_object")) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        value[0] = new OES_vertex_array_object(canvas);
+                    } else {
+                        value[0] = null;
+                    }
+                } else if (name.equals("WEBGL_color_buffer_float") && extensions.contains("GL_OES_packed_depth_stencil")) {
+                    value[0] = new WEBGL_color_buffer_float();
                 } else if (name.equals("WEBGL_compressed_texture_atc") && extensions.contains("GL_AMD_compressed_ATC_texture")) {
                     value[0] = new WEBGL_compressed_texture_atc();
                 } else if (name.equals("WEBGL_compressed_texture_etc1") && extensions.contains("GL_OES_compressed_ETC1_RGB8_texture")) {
@@ -1375,12 +1394,29 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
                 } else if (name.equals("WEBGL_compressed_texture_etc")) {
                     if (canvas.glVersion > 2) {
                         value[0] = new WEBGL_compressed_texture_etc();
+                    } else {
+                        value[0] = null;
                     }
-                    value[0] = null;
                 } else if (name.equals("WEBGL_compressed_texture_pvrtc") && extensions.contains("GL_IMG_texture_compression_pvrtc")) {
                     value[0] = new WEBGL_compressed_texture_pvrtc();
                 } else if (name.equals("WEBGL_lose_context")) {
                     value[0] = new WEBGL_lose_context(canvas);
+                } else if (name.equals("ANGLE_instanced_arrays")) {
+                    if (canvas.glVersion > 2) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                            value[0] = new ANGLE_instanced_arrays();
+                        } else {
+                            value[0] = null;
+                        }
+                    }
+                } else if (name.equals("WEBGL_depth_texture") && extensions.contains("GL_OES_depth_texture") && extensions.contains("GL_OES_packed_depth_stencil")) {
+                    value[0] = new WEBGL_depth_texture();
+                } else if (name.equals("WEBGL_draw_buffers") && extensions.contains("GL_EXT_draw_buffers")) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        value[0] = new WEBGL_draw_buffers();
+                    } else {
+                        value[0] = null;
+                    }
                 } else {
                     value[0] = null;
                 }
@@ -1715,12 +1751,19 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
     public WebGLShaderPrecisionFormat getShaderPrecisionFormat(final int shaderType, final int precisionType) {
         final CountDownLatch lock = new CountDownLatch(1);
         final WebGLShaderPrecisionFormat precisionFormat = new WebGLShaderPrecisionFormat();
+        final boolean[] hasError = new boolean[1];
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
                 IntBuffer range = IntBuffer.allocate(2);
                 IntBuffer precision = IntBuffer.allocate(1);
                 GLES20.glGetShaderPrecisionFormat(shaderType, precisionType, range, precision);
+                int error = GLES20.glGetError();
+                if (error == GLES20.GL_INVALID_ENUM || error == GLES20.GL_INVALID_OPERATION) {
+                    hasError[0] = true;
+                    lock.countDown();
+                    return;
+                }
                 precisionFormat.rangeMin = range.get(0);
                 precisionFormat.rangeMax = range.get(1);
                 precisionFormat.precision = precision.get(0);
@@ -1730,6 +1773,9 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         try {
             lock.await();
         } catch (InterruptedException ignored) {
+        }
+        if (hasError[0]) {
+            return null;
         }
         return precisionFormat;
     }
@@ -1769,21 +1815,32 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         return extensions.get(0);
     }
 
-    public int getTexParameter(final int target, final int pname) {
+    public Object getTexParameter(final int target, final int pname) {
         final CountDownLatch lock = new CountDownLatch(1);
         final int[] parameters = new int[1];
+        final boolean[] hasError = new boolean[1];
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
                 IntBuffer params = IntBuffer.allocate(1);
                 GLES20.glGetTexParameteriv(target, pname, params);
+                int error = GLES20.glGetError();
+                if (error == GLES20.GL_INVALID_ENUM || error == GLES20.GL_INVALID_OPERATION) {
+                    hasError[0] = true;
+                    lock.countDown();
+                    return;
+                }
                 parameters[0] = params.get(0);
+
                 lock.countDown();
             }
         });
         try {
             lock.await();
         } catch (InterruptedException ignored) {
+        }
+        if (hasError[0]) {
+            return null;
         }
         return parameters[0];
     }
@@ -1955,14 +2012,14 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         return attrib[0];
     }
 
-    public int getVertexAttribOffset(final int index, final int pname) {
+    public long getVertexAttribOffset(final int index, final int pname) {
         final CountDownLatch lock = new CountDownLatch(1);
-        final int[] offset = new int[1];
+        final long[] offset = new long[1];
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                IntBuffer buffer = IntBuffer.allocate(1);
-                GLES20.glGetVertexAttribiv(index, pname, buffer);
+                LongBuffer buffer = LongBuffer.allocate(1);
+                nativeGetVertexAttribOffset(index, pname, buffer);
                 offset[0] = buffer.get(0);
                 lock.countDown();
             }
@@ -2513,6 +2570,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         }
     }
 
+    /*
     private int bytesPerPixel(int type, int format) {
         int bytesPerComponent = 0;
         switch (type) {
@@ -2544,6 +2602,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         }
         return 0;
     }
+    */
 
     public void texImage2D(final int target, final int level, final int internalformat, final int format, final int type, final ImageAsset asset) {
         final CountDownLatch lock = new CountDownLatch(1);
@@ -3198,28 +3257,484 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         }
     }
 
-    public final int ONE_MINUS_CONSTANT_ALPHA = GLES20.GL_ONE_MINUS_CONSTANT_ALPHA;
-    public final int CONSTANT_ALPHA = GLES20.GL_CONSTANT_ALPHA;
-    public final int ONE_MINUS_CONSTANT_COLOR = GLES20.GL_ONE_MINUS_CONSTANT_COLOR;
+    /* Clearing buffers */
 
-    public final int CONSTANT_COLOR = GLES20.GL_CONSTANT_COLOR;
+    public final int DEPTH_BUFFER_BIT = GLES20.GL_DEPTH_BUFFER_BIT;
 
-    public final int SRC_ALPHA_SATURATE = GLES20.GL_SRC_ALPHA_SATURATE;
+    public final int COLOR_BUFFER_BIT = GLES20.GL_COLOR_BUFFER_BIT;
 
-    public final int ONE_MINUS_DST_COLOR = GLES20.GL_ONE_MINUS_DST_COLOR;
+    public final int STENCIL_BUFFER_BIT = GLES20.GL_STENCIL_BUFFER_BIT;
 
-    public final int DST_COLOR = GLES20.GL_DST_COLOR;
+    /* Clearing buffers */
 
-    public final int ONE_MINUS_DST_ALPHA = GLES20.GL_ONE_MINUS_DST_ALPHA;
+    /* Rendering primitives */
 
-    public final int DST_ALPHA = GLES20.GL_DST_ALPHA;
+    public final int POINTS = GLES20.GL_POINTS;
+
+    public final int LINES = GLES20.GL_LINES;
+
+    public final int LINE_LOOP = GLES20.GL_LINE_LOOP;
+
+    public final int LINE_STRIP = GLES20.GL_LINE_STRIP;
+
+    public final int TRIANGLES = GLES20.GL_TRIANGLES;
+
+    public final int TRIANGLE_STRIP = GLES20.GL_TRIANGLE_STRIP;
+
+    public final int TRIANGLE_FAN = GLES20.GL_TRIANGLE_FAN;
+
+    /* Rendering primitives */
+
+    /* Blending modes */
+
+
+    public final int ONE = GLES20.GL_ONE;
+
+    public final int ZERO = GLES20.GL_ZERO;
+    public final int SRC_COLOR = GLES20.GL_SRC_COLOR;
 
     public final int ONE_MINUS_SRC_COLOR = GLES20.GL_ONE_MINUS_SRC_COLOR;
-    public final int SRC_COLOR = GLES20.GL_SRC_COLOR;
+
+    public final int SRC_ALPHA = GLES20.GL_SRC_ALPHA;
 
     public final int ONE_MINUS_SRC_ALPHA = GLES20.GL_ONE_MINUS_SRC_ALPHA;
 
-    public final int SRC_ALPHA = GLES20.GL_SRC_ALPHA;
+    public final int DST_ALPHA = GLES20.GL_DST_ALPHA;
+
+    public final int ONE_MINUS_DST_ALPHA = GLES20.GL_ONE_MINUS_DST_ALPHA;
+
+    public final int DST_COLOR = GLES20.GL_DST_COLOR;
+
+    public final int ONE_MINUS_DST_COLOR = GLES20.GL_ONE_MINUS_DST_COLOR;
+
+    public final int SRC_ALPHA_SATURATE = GLES20.GL_SRC_ALPHA_SATURATE;
+
+    public final int CONSTANT_COLOR = GLES20.GL_CONSTANT_COLOR;
+    public final int ONE_MINUS_CONSTANT_COLOR = GLES20.GL_ONE_MINUS_CONSTANT_COLOR;
+
+    public final int CONSTANT_ALPHA = GLES20.GL_CONSTANT_ALPHA;
+    public final int ONE_MINUS_CONSTANT_ALPHA = GLES20.GL_ONE_MINUS_CONSTANT_ALPHA;
+
+    /* Blending modes */
+
+    /* Blending equations */
+    public final int FUNC_ADD = GLES20.GL_FUNC_ADD;
+
+    public final int FUNC_SUBTRACT = GLES20.GL_FUNC_SUBTRACT;
+
+    public final int FUNC_REVERSE_SUBTRACT = GLES20.GL_FUNC_REVERSE_SUBTRACT;
+
+    /* Blending equations */
+
+
+    /* Getting GL parameter information */
+
+    public final int BLEND_EQUATION = GLES20.GL_BLEND_EQUATION;
+
+    public final int BLEND_EQUATION_RGB = GLES20.GL_BLEND_EQUATION_RGB;
+
+    public final int BLEND_EQUATION_ALPHA = GLES20.GL_BLEND_EQUATION_ALPHA;
+
+    public final int BLEND_DST_RGB = GLES20.GL_BLEND_DST_RGB;
+
+    public final int BLEND_SRC_RGB = GLES20.GL_BLEND_SRC_RGB;
+
+    public final int BLEND_DST_ALPHA = GLES20.GL_BLEND_DST_ALPHA;
+
+    public final int BLEND_SRC_ALPHA = GLES20.GL_BLEND_SRC_ALPHA;
+
+    public final int BLEND_COLOR = GLES20.GL_BLEND_COLOR;
+
+    public final int ARRAY_BUFFER_BINDING = GLES20.GL_ARRAY_BUFFER_BINDING;
+
+    public final int ELEMENT_ARRAY_BUFFER_BINDING = GLES20.GL_ELEMENT_ARRAY_BUFFER_BINDING;
+
+    public final int LINE_WIDTH = GLES20.GL_LINE_WIDTH;
+
+    public final int ALIASED_POINT_SIZE_RANGE = GLES20.GL_ALIASED_POINT_SIZE_RANGE;
+
+    public final int ALIASED_LINE_WIDTH_RANGE = GLES20.GL_ALIASED_LINE_WIDTH_RANGE;
+
+    public final int CULL_FACE_MODE = GLES20.GL_CULL_FACE_MODE;
+
+    public final int FRONT_FACE = GLES20.GL_FRONT_FACE;
+
+    public final int DEPTH_RANGE = GLES20.GL_DEPTH_RANGE;
+
+    public final int DEPTH_WRITEMASK = GLES20.GL_DEPTH_WRITEMASK;
+
+    public final int DEPTH_CLEAR_VALUE = GLES20.GL_DEPTH_CLEAR_VALUE;
+
+    public final int DEPTH_FUNC = GLES20.GL_DEPTH_FUNC;
+
+    public final int STENCIL_CLEAR_VALUE = GLES20.GL_STENCIL_CLEAR_VALUE;
+
+    public final int STENCIL_FUNC = GLES20.GL_STENCIL_FUNC;
+
+    public final int STENCIL_FAIL = GLES20.GL_STENCIL_FAIL;
+
+    public final int STENCIL_PASS_DEPTH_FAIL = GLES20.GL_STENCIL_PASS_DEPTH_FAIL;
+
+    public final int STENCIL_PASS_DEPTH_PASS = GLES20.GL_STENCIL_PASS_DEPTH_PASS;
+
+    public final int STENCIL_REF = GLES20.GL_STENCIL_REF;
+
+    public final int STENCIL_VALUE_MASK = GLES20.GL_STENCIL_VALUE_MASK;
+
+    public final int STENCIL_WRITEMASK = GLES20.GL_STENCIL_WRITEMASK;
+
+    public final int STENCIL_BACK_FUNC = GLES20.GL_STENCIL_BACK_FUNC;
+
+    public final int STENCIL_BACK_FAIL = GLES20.GL_STENCIL_BACK_FAIL;
+
+    public final int STENCIL_BACK_PASS_DEPTH_FAIL = GLES20.GL_STENCIL_BACK_PASS_DEPTH_FAIL;
+
+    public final int STENCIL_BACK_PASS_DEPTH_PASS = GLES20.GL_STENCIL_BACK_PASS_DEPTH_PASS;
+
+    public final int STENCIL_BACK_REF = GLES20.GL_STENCIL_BACK_REF;
+
+    public final int STENCIL_BACK_VALUE_MASK = GLES20.GL_STENCIL_BACK_VALUE_MASK;
+
+    public final int STENCIL_BACK_WRITEMASK = GLES20.GL_STENCIL_BACK_WRITEMASK;
+
+    public final int VIEWPORT = GLES20.GL_VIEWPORT;
+
+    public final int SCISSOR_BOX = GLES20.GL_SCISSOR_BOX;
+
+    public final int COLOR_CLEAR_VALUE = GLES20.GL_COLOR_CLEAR_VALUE;
+
+    public final int COLOR_WRITEMASK = GLES20.GL_COLOR_WRITEMASK;
+
+    public final int UNPACK_ALIGNMENT = GLES20.GL_UNPACK_ALIGNMENT;
+
+    public final int PACK_ALIGNMENT = GLES20.GL_PACK_ALIGNMENT;
+
+    public final int MAX_TEXTURE_SIZE = GLES20.GL_MAX_TEXTURE_SIZE;
+
+    public final int MAX_VIEWPORT_DIMS = GLES20.GL_MAX_VIEWPORT_DIMS;
+
+    public final int SUBPIXEL_BITS = GLES20.GL_SUBPIXEL_BITS;
+
+    public final int RED_BITS = GLES20.GL_RED_BITS;
+
+    public final int GREEN_BITS = GLES20.GL_GREEN_BITS;
+
+    public final int BLUE_BITS = GLES20.GL_BLUE_BITS;
+
+    public final int ALPHA_BITS = GLES20.GL_ALPHA_BITS;
+
+    public final int DEPTH_BITS = GLES20.GL_DEPTH_BITS;
+
+    public final int STENCIL_BITS = GLES20.GL_STENCIL_BITS;
+
+    public final int POLYGON_OFFSET_UNITS = GLES20.GL_POLYGON_OFFSET_UNITS;
+
+    public final int POLYGON_OFFSET_FACTOR = GLES20.GL_POLYGON_OFFSET_FACTOR;
+
+    public final int TEXTURE_BINDING_2D = GLES20.GL_TEXTURE_BINDING_2D;
+
+    public final int SAMPLE_BUFFERS = GLES20.GL_SAMPLE_BUFFERS;
+
+    public final int SAMPLES = GLES20.GL_SAMPLES;
+
+    public final int SAMPLE_COVERAGE_VALUE = GLES20.GL_SAMPLE_COVERAGE_VALUE;
+
+    public final int SAMPLE_COVERAGE_INVERT = GLES20.GL_SAMPLE_COVERAGE_INVERT;
+
+    public final int COMPRESSED_TEXTURE_FORMATS = GLES20.GL_COMPRESSED_TEXTURE_FORMATS;
+
+    public final int VENDOR = GLES20.GL_VENDOR;
+
+    public final int RENDERER = GLES20.GL_RENDERER;
+
+    public final int VERSION = GLES20.GL_VERSION;
+
+    public final int IMPLEMENTATION_COLOR_READ_TYPE = GLES20.GL_IMPLEMENTATION_COLOR_READ_TYPE;
+
+    public final int IMPLEMENTATION_COLOR_READ_FORMAT = GLES20.GL_IMPLEMENTATION_COLOR_READ_FORMAT;
+
+    public final int BROWSER_DEFAULT_WEBGL = 0x9244;
+
+    /* Getting GL parameter information */
+
+    /* Buffers */
+
+    public final int STATIC_DRAW = GLES20.GL_STATIC_DRAW;
+
+    public final int STREAM_DRAW = GLES20.GL_STREAM_DRAW;
+
+    public final int DYNAMIC_DRAW = GLES20.GL_DYNAMIC_DRAW;
+
+    public final int ARRAY_BUFFER = GLES20.GL_ARRAY_BUFFER;
+
+    public final int ELEMENT_ARRAY_BUFFER = GLES20.GL_ELEMENT_ARRAY_BUFFER;
+
+    public final int BUFFER_SIZE = GLES20.GL_BUFFER_SIZE;
+
+    public final int BUFFER_USAGE = GLES20.GL_BUFFER_USAGE;
+
+    /* Buffers */
+
+    /* Vertex attributes */
+
+    public final int CURRENT_VERTEX_ATTRIB = GLES20.GL_CURRENT_VERTEX_ATTRIB;
+
+    public final int VERTEX_ATTRIB_ARRAY_ENABLED = GLES20.GL_VERTEX_ATTRIB_ARRAY_ENABLED;
+
+    public final int VERTEX_ATTRIB_ARRAY_SIZE = GLES20.GL_VERTEX_ATTRIB_ARRAY_SIZE;
+
+    public final int VERTEX_ATTRIB_ARRAY_STRIDE = GLES20.GL_VERTEX_ATTRIB_ARRAY_STRIDE;
+
+    public final int VERTEX_ATTRIB_ARRAY_TYPE = GLES20.GL_VERTEX_ATTRIB_ARRAY_TYPE;
+
+    public final int VERTEX_ATTRIB_ARRAY_NORMALIZED = GLES20.GL_VERTEX_ATTRIB_ARRAY_NORMALIZED;
+
+    public final int VERTEX_ATTRIB_ARRAY_POINTER = GLES20.GL_VERTEX_ATTRIB_ARRAY_POINTER;
+
+    public final int VERTEX_ATTRIB_ARRAY_BUFFER_BINDING = GLES20.GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING;
+
+    /* Vertex attributes */
+
+    /* Culling */
+
+    public final int CULL_FACE = GLES20.GL_CULL_FACE;
+
+    public final int FRONT = GLES20.GL_FRONT;
+
+    public final int BACK = GLES20.GL_BACK;
+
+    public final int FRONT_AND_BACK = GLES20.GL_FRONT_AND_BACK;
+
+    /* Culling */
+
+    /* Enabling and disabling */
+
+    public final int BLEND = GLES20.GL_BLEND;
+
+    public final int DEPTH_TEST = GLES20.GL_DEPTH_TEST;
+
+    public final int DITHER = GLES20.GL_DITHER;
+
+    public final int POLYGON_OFFSET_FILL = GLES20.GL_POLYGON_OFFSET_FILL;
+
+    public final int SAMPLE_ALPHA_TO_COVERAGE = GLES20.GL_SAMPLE_ALPHA_TO_COVERAGE;
+
+    public final int SAMPLE_COVERAGE = GLES20.GL_SAMPLE_COVERAGE;
+
+    public final int SCISSOR_TEST = GLES20.GL_SCISSOR_TEST;
+
+    public final int STENCIL_TEST = GLES20.GL_STENCIL_TEST;
+
+    /* Enabling and disabling */
+
+    /* Errors */
+    public final int NO_ERROR = GLES20.GL_NO_ERROR;
+
+    public final int INVALID_ENUM = GLES20.GL_INVALID_ENUM;
+
+    public final int INVALID_VALUE = GLES20.GL_INVALID_VALUE;
+
+    public final int INVALID_OPERATION = GLES20.GL_INVALID_OPERATION;
+
+    public final int INVALID_FRAMEBUFFER_OPERATION = GLES20.GL_INVALID_FRAMEBUFFER_OPERATION;
+
+    public final int OUT_OF_MEMORY = GLES20.GL_OUT_OF_MEMORY;
+
+    public final int CONTEXT_LOST_WEBGL = 0x9242;
+    /* Errors */
+
+    /* Front face directions */
+
+    public final int CW = GLES20.GL_CW;
+
+    public final int CCW = GLES20.GL_CCW;
+
+    /* Front face directions */
+
+
+    /* Hints */
+
+    public final int DONT_CARE = GLES20.GL_DONT_CARE;
+
+    public final int FASTEST = GLES20.GL_FASTEST;
+
+    public final int NICEST = GLES20.GL_NICEST;
+
+    public final int GENERATE_MIPMAP_HINT = GLES20.GL_GENERATE_MIPMAP_HINT;
+
+    /* Hints */
+
+
+    /* Data types */
+
+    public final int BYTE = GLES20.GL_BYTE;
+
+    public final int UNSIGNED_BYTE = GLES20.GL_UNSIGNED_BYTE;
+
+    public final int UNSIGNED_SHORT = GLES20.GL_UNSIGNED_SHORT;
+
+    public final int SHORT = GLES20.GL_SHORT;
+
+    public final int UNSIGNED_INT = GLES20.GL_UNSIGNED_INT;
+
+    public final int INT = GLES20.GL_INT;
+
+    public final int FLOAT = GLES20.GL_FLOAT;
+
+    /* Data types */
+
+
+    /* Pixel formats */
+
+    public final int DEPTH_COMPONENT = GLES20.GL_DEPTH_COMPONENT;
+
+    public final int ALPHA = GLES20.GL_ALPHA;
+
+    public final int RGB = GLES20.GL_RGB;
+
+    public final int RGBA = GLES20.GL_RGBA;
+
+    public final int LUMINANCE = GLES20.GL_LUMINANCE;
+
+    public final int LUMINANCE_ALPHA = GLES20.GL_LUMINANCE_ALPHA;
+
+    /* Pixel formats */
+
+    /* Pixel types */
+
+    // public final int UNSIGNED_BYTE = GLES20.GL_UNSIGNED_BYTE;
+
+    public final int UNSIGNED_SHORT_4_4_4_4 = GLES20.GL_UNSIGNED_SHORT_4_4_4_4;
+
+    public final int UNSIGNED_SHORT_5_5_5_1 = GLES20.GL_UNSIGNED_SHORT_5_5_5_1;
+
+    public final int UNSIGNED_SHORT_5_6_5 = GLES20.GL_UNSIGNED_SHORT_5_6_5;
+
+    /* Pixel types */
+
+    /* Shaders */
+
+    public final int FRAGMENT_SHADER = GLES20.GL_FRAGMENT_SHADER;
+
+    public final int VERTEX_SHADER = GLES20.GL_VERTEX_SHADER;
+
+    public final int COMPILE_STATUS = GLES20.GL_COMPILE_STATUS;
+
+    public final int DELETE_STATUS = GLES20.GL_DELETE_STATUS;
+
+    public final int LINK_STATUS = GLES20.GL_LINK_STATUS;
+
+    public final int VALIDATE_STATUS = GLES20.GL_VALIDATE_STATUS;
+
+    public final int ATTACHED_SHADERS = GLES20.GL_ATTACHED_SHADERS;
+
+    public final int ACTIVE_ATTRIBUTES = GLES20.GL_ACTIVE_ATTRIBUTES;
+
+    public final int ACTIVE_UNIFORMS = GLES20.GL_ACTIVE_UNIFORMS;
+
+    public final int MAX_VERTEX_UNIFORM_VECTORS = GLES20.GL_MAX_VERTEX_UNIFORM_VECTORS;
+
+    public final int MAX_VARYING_VECTORS = GLES20.GL_MAX_VARYING_VECTORS;
+
+    public final int MAX_COMBINED_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS;
+
+    public final int MAX_VERTEX_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS;
+
+    public final int MAX_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_TEXTURE_IMAGE_UNITS;
+
+    public final int MAX_VERTEX_ATTRIBS = GLES20.GL_MAX_VERTEX_ATTRIBS;
+
+    public final int MAX_FRAGMENT_UNIFORM_VECTORS = GLES20.GL_MAX_FRAGMENT_UNIFORM_VECTORS;
+
+    public final int SHADER_TYPE = GLES20.GL_SHADER_TYPE;
+
+    public final int SHADING_LANGUAGE_VERSION = GLES20.GL_SHADING_LANGUAGE_VERSION;
+
+    public final int CURRENT_PROGRAM = GLES20.GL_CURRENT_PROGRAM;
+
+    /* Shaders */
+
+    /* Depth or stencil tests */
+
+    public final int NEVER = GLES20.GL_NEVER;
+
+    public final int LESS = GLES20.GL_LESS;
+
+    public final int EQUAL = GLES20.GL_EQUAL;
+
+    public final int LEQUAL = GLES20.GL_LEQUAL;
+
+    public final int GREATER = GLES20.GL_GREATER;
+
+    public final int NOTEQUAL = GLES20.GL_NOTEQUAL;
+
+    public final int GEQUAL = GLES20.GL_GEQUAL;
+
+    public final int ALWAYS = GLES20.GL_ALWAYS;
+
+    /* Depth or stencil tests */
+
+    /* Stencil actions */
+
+    public final int KEEP = GLES20.GL_KEEP;
+
+    public final int REPLACE = GLES20.GL_REPLACE;
+
+    public final int INCR = GLES20.GL_INCR;
+
+    public final int DECR = GLES20.GL_DECR;
+
+    public final int INVERT = GLES20.GL_INVERT;
+
+    public final int INCR_WRAP = GLES20.GL_INCR_WRAP;
+
+    public final int DECR_WRAP = GLES20.GL_DECR_WRAP;
+
+    /* Stencil actions */
+
+    /* Textures */
+
+    public final int NEAREST = GLES20.GL_NEAREST;
+
+    public final int LINEAR = GLES20.GL_LINEAR;
+
+    public final int NEAREST_MIPMAP_NEAREST = GLES20.GL_NEAREST_MIPMAP_NEAREST;
+
+    public final int LINEAR_MIPMAP_NEAREST = GLES20.GL_LINEAR_MIPMAP_NEAREST;
+
+    public final int NEAREST_MIPMAP_LINEAR = GLES20.GL_NEAREST_MIPMAP_LINEAR;
+
+    public final int LINEAR_MIPMAP_LINEAR = GLES20.GL_LINEAR_MIPMAP_LINEAR;
+
+    public final int TEXTURE_MAG_FILTER = GLES20.GL_TEXTURE_MAG_FILTER;
+
+    public final int TEXTURE_MIN_FILTER = GLES20.GL_TEXTURE_MIN_FILTER;
+
+    public final int TEXTURE_WRAP_S = GLES20.GL_TEXTURE_WRAP_S;
+
+    public final int TEXTURE_WRAP_T = GLES20.GL_TEXTURE_WRAP_T;
+
+    public final int TEXTURE_2D = GLES20.GL_TEXTURE_2D;
+
+    public final int TEXTURE = GLES20.GL_TEXTURE;
+
+    public final int TEXTURE_CUBE_MAP = GLES20.GL_TEXTURE_CUBE_MAP;
+
+    public final int TEXTURE_BINDING_CUBE_MAP = GLES20.GL_TEXTURE_BINDING_CUBE_MAP;
+
+    public final int TEXTURE_CUBE_MAP_POSITIVE_X = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+
+    public final int TEXTURE_CUBE_MAP_NEGATIVE_X = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_X;
+
+    public final int TEXTURE_CUBE_MAP_POSITIVE_Y = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_Y;
+
+    public final int TEXTURE_CUBE_MAP_NEGATIVE_Y = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_Y;
+
+    public final int TEXTURE_CUBE_MAP_POSITIVE_Z = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_Z;
+
+    public final int TEXTURE_CUBE_MAP_NEGATIVE_Z = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_Z;
+
+    public final int MAX_CUBE_MAP_TEXTURE_SIZE = GLES20.GL_MAX_CUBE_MAP_TEXTURE_SIZE;
 
     public final int TEXTURE0 = GLES20.GL_TEXTURE0;
 
@@ -3285,315 +3800,25 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
 
     public final int TEXTURE31 = GLES20.GL_TEXTURE31;
 
-    public final int DEPTH_BUFFER_BIT = GLES20.GL_DEPTH_BUFFER_BIT;
+    public final int ACTIVE_TEXTURE = GLES20.GL_ACTIVE_TEXTURE;
 
-    public final int COLOR_BUFFER_BIT = GLES20.GL_COLOR_BUFFER_BIT;
+    public final int REPEAT = GLES20.GL_REPEAT;
 
-    public final int STENCIL_BUFFER_BIT = GLES20.GL_STENCIL_BUFFER_BIT;
+    public final int CLAMP_TO_EDGE = GLES20.GL_CLAMP_TO_EDGE;
 
-    public final int VERTEX_SHADER = GLES20.GL_VERTEX_SHADER;
+    public final int MIRRORED_REPEAT = GLES20.GL_MIRRORED_REPEAT;
 
-    public final int FRAGMENT_SHADER = GLES20.GL_FRAGMENT_SHADER;
+    /* Textures */
 
-    public final int ARRAY_BUFFER = GLES20.GL_ARRAY_BUFFER;
 
-    public final int ELEMENT_ARRAY_BUFFER = GLES20.GL_ELEMENT_ARRAY_BUFFER;
 
-    public final int FRAMEBUFFER = GLES20.GL_FRAMEBUFFER;
-
-    public final int RENDERBUFFER = GLES20.GL_RENDERBUFFER;
-
-    public final int TEXTURE_2D = GLES20.GL_TEXTURE_2D;
-
-    public final int TEXTURE_CUBE_MAP = GLES20.GL_TEXTURE_CUBE_MAP;
-
-    public final int FUNC_ADD = GLES20.GL_FUNC_ADD;
-
-    public final int FUNC_SUBTRACT = GLES20.GL_FUNC_SUBTRACT;
-
-    public final int FUNC_REVERSE_SUBTRACT = GLES20.GL_FUNC_REVERSE_SUBTRACT;
-
-    public final int ONE = GLES20.GL_ONE;
-
-    public final int ZERO = GLES20.GL_ZERO;
-
-    public final int FRAMEBUFFER_COMPLETE = GLES20.GL_FRAMEBUFFER_COMPLETE;
-
-    public final int FRAMEBUFFER_INCOMPLETE_ATTACHMENT = GLES20.GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-
-    public final int FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT = GLES20.GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
-
-    public final int FRAMEBUFFER_INCOMPLETE_DIMENSIONS = GLES20.GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
-
-    public final int FRAMEBUFFER_UNSUPPORTED = GLES20.GL_FRAMEBUFFER_UNSUPPORTED;
-
-    public final int INVALID_ENUM = GLES20.GL_INVALID_ENUM;
-
-    public final int TEXTURE_CUBE_MAP_POSITIVE_X = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_X;
-
-    public final int TEXTURE_CUBE_MAP_NEGATIVE_X = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_X;
-
-    public final int TEXTURE_CUBE_MAP_POSITIVE_Y = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_Y;
-
-    public final int TEXTURE_CUBE_MAP_NEGATIVE_Y = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_Y;
-
-    public final int TEXTURE_CUBE_MAP_POSITIVE_Z = GLES20.GL_TEXTURE_CUBE_MAP_POSITIVE_Z;
-
-    public final int TEXTURE_CUBE_MAP_NEGATIVE_Z = GLES20.GL_TEXTURE_CUBE_MAP_NEGATIVE_Z;
-
-    /* New Tokens */
-    public final int COMPRESSED_RGB_S3TC_DXT1_EXT = 0x83F0;
-
-    public final int COMPRESSED_RGBA_S3TC_DXT1_EXT = 0x83F1;
-
-    public final int COMPRESSED_RGBA_S3TC_DXT3_EXT = 0x83F2;
-
-    public final int COMPRESSED_RGBA_S3TC_DXT5_EXT = 0x83F3;
-
-    public final int COMPRESSED_SRGB_S3TC_DXT1_EXT = 0x8C4C;
-
-    public final int COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT = 0x8C4D;
-
-    public final int COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT = 0x8C4E;
-
-    public final int COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT = 0x8C4F;
-    /* New Tokens */
-
-    public final int COMPRESSED_R11_EAC = 0x9270;
-
-    public final int COMPRESSED_SIGNED_R11_EAC = 0x9271;
-
-    public final int COMPRESSED_RG11_EAC = 0x9272;
-
-    public final int COMPRESSED_SIGNED_RG11_EAC = 0x9273;
-
-    public final int COMPRESSED_RGB8_ETC2 = 0x9274;
-
-
-    public final int COMPRESSED_RGBA8_ETC2_EAC = 0x9278;
-
-    public final int COMPRESSED_SRGB8_ETC2 = 0x9275;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ETC2_EAC = 0x9279;
-
-    public final int COMPRESSED_RGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9276;
-
-    public final int COMPRESSED_SRGB8_PUNCHTHROUGH_ALPHA1_ETC2 = 0x9277;
-
-    public final int COMPRESSED_RGB_PVRTC_4BPPV1_IMG = 0x8C00;
-
-    public final int COMPRESSED_RGBA_PVRTC_4BPPV1_IMG = 0x8C02;
-
-    public final int COMPRESSED_RGB_PVRTC_2BPPV1_IMG = 0x8C01;
-
-    public final int COMPRESSED_RGBA_PVRTC_2BPPV1_IMG = 0x8C03;
-
-    public final int COMPRESSED_RGB_ETC1_WEBGL = 0x8d64;
-
-    public final int COMPRESSED_RGB_ATC_WEBGL = 0x8c92;
-
-    public final int COMPRESSED_RGBA_ATC_EXPLICIT_ALPHA_WEBGL = 0x8c92;
-
-    public final int COMPRESSED_RGBA_ATC_INTERPOLATED_ALPHA_WEBGL = 0x87ee;
-
-    public final int COMPRESSED_RGBA_ASTC_4x4_KHR = 0x93B0;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_4x4_KHR = 0x93D0;
-
-    public final int COMPRESSED_RGBA_ASTC_5x4_KHR = 0x93B1;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_5x4_KHR = 0x93D1;
-
-
-    public final int COMPRESSED_RGBA_ASTC_5x5_KHR = 0x93B2;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_5x5_KHR = 0x93D2;
-
-    public final int COMPRESSED_RGBA_ASTC_6x5_KHR = 0x93B3;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_6x5_KHR = 0x93D3;
-
-    public final int COMPRESSED_RGBA_ASTC_6x6_KHR = 0x93B4;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_6x6_KHR = 0x93D4;
-
-    public final int COMPRESSED_RGBA_ASTC_8x5_KHR = 0x93B5;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_8x5_KHR = 0x93D5;
-
-    public final int COMPRESSED_RGBA_ASTC_8x6_KHR = 0x93B6;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_8x6_KHR = 0x93D6;
-
-
-    public final int COMPRESSED_RGBA_ASTC_8x8_KHR = 0x93B7;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_8x8_KHR = 0x93D7;
-
-    public final int COMPRESSED_RGBA_ASTC_10x5_KHR = 0x93B8;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_10x5_KHR = 0x93D8;
-
-
-    public final int COMPRESSED_RGBA_ASTC_10x6_KHR = 0x93B9;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_10x6_KHR = 0x93D9;
-
-    public final int COMPRESSED_RGBA_ASTC_10x10_KHR = 0x93BB;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR = 0x93DB;
-
-
-    public final int COMPRESSED_RGBA_ASTC_12x10_KHR = 0x93BC;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR = 0x93DC;
-
-    public final int COMPRESSED_RGBA_ASTC_12x12_KHR = 0x93BD;
-
-    public final int COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR = 0x93DD;
-
-
-    public final int COMPRESSED_RGBA_BPTC_UNORM_EXT = 0x8E8C;
-
-    public final int COMPRESSED_SRGB_ALPHA_BPTC_UNORM_EXT = 0x8E8D;
-
-    public final int COMPRESSED_RGB_BPTC_SIGNED_FLOAT_EXT = 0x8E8E;
-
-    public final int COMPRESSED_RGB_BPTC_UNSIGNED_FLOAT_EXT = 0x8E8F;
-
-    public final int COMPRESSED_RED_RGTC1_EXT = 0x8DBB;
-
-    public final int COMPRESSED_SIGNED_RED_RGTC1_EXT = 0x8DBC;
-
-    public final int COMPRESSED_RED_GREEN_RGTC2_EXT = 0x8DBD;
-
-    public final int COMPRESSED_SIGNED_RED_GREEN_RGTC2_EXT = 0x8DBE;
-
-    public final int ALPHA = GLES20.GL_ALPHA;
-
-    public final int RGB = GLES20.GL_RGB;
-
-    public final int RGBA = GLES20.GL_RGBA;
-
-    public final int LUMINANCE = GLES20.GL_LUMINANCE;
-
-    public final int LUMINANCE_ALPHA = GLES20.GL_LUMINANCE_ALPHA;
-
-    public final int FRONT = GLES20.GL_FRONT;
-
-    public final int BACK = GLES20.GL_BACK;
-
-    public final int FRONT_AND_BACK = GLES20.GL_FRONT_AND_BACK;
-
-    public final int NEVER = GLES20.GL_NEVER;
-
-    public final int LESS = GLES20.GL_LESS;
-
-    public final int EQUAL = GLES20.GL_EQUAL;
-
-    public final int LEQUAL = GLES20.GL_LEQUAL;
-
-    public final int GREATER = GLES20.GL_GREATER;
-
-    public final int NOTEQUAL = GLES20.GL_NOTEQUAL;
-
-    public final int GEQUAL = GLES20.GL_GEQUAL;
-
-    public final int ALWAYS = GLES20.GL_ALWAYS;
-
-    public final int BLEND = GLES20.GL_BLEND;
-
-    public final int CULL_FACE = GLES20.GL_CULL_FACE;
-
-    public final int DEPTH_TEST = GLES20.GL_DEPTH_TEST;
-
-    public final int DITHER = GLES20.GL_DITHER;
-
-    public final int POLYGON_OFFSET_FILL = GLES20.GL_POLYGON_OFFSET_FILL;
-
-    public final int SAMPLE_ALPHA_TO_COVERAGE = GLES20.GL_SAMPLE_ALPHA_TO_COVERAGE;
-
-    public final int SAMPLE_COVERAGE = GLES20.GL_SAMPLE_COVERAGE;
-
-    public final int SCISSOR_TEST = GLES20.GL_SCISSOR_TEST;
-
-    public final int STENCIL_TEST = GLES20.GL_STENCIL_TEST;
-
-    public final int POINTS = GLES20.GL_POINTS;
-
-    public final int LINE_STRIP = GLES20.GL_LINE_STRIP;
-
-    public final int LINE_LOOP = GLES20.GL_LINE_LOOP;
-
-    public final int LINES = GLES20.GL_LINES;
-
-    public final int TRIANGLE_STRIP = GLES20.GL_TRIANGLE_STRIP;
-
-    public final int TRIANGLE_FAN = GLES20.GL_TRIANGLE_FAN;
-
-    public final int TRIANGLES = GLES20.GL_TRIANGLES;
-
-    public final int UNSIGNED_BYTE = GLES20.GL_UNSIGNED_BYTE;
-
-    public final int UNSIGNED_SHORT = GLES20.GL_UNSIGNED_SHORT;
-
-    public final int UNSIGNED_INT = GLES20.GL_UNSIGNED_INT;
-
-    public final int COLOR_ATTACHMENT0 = GLES20.GL_COLOR_ATTACHMENT0;
-
-    public final int DEPTH_ATTACHMENT = GLES20.GL_DEPTH_ATTACHMENT;
-
-    public final int DEPTH_STENCIL_ATTACHMENT = 0x821A;
-
-    public final int STENCIL_ATTACHMENT = GLES20.GL_STENCIL_ATTACHMENT;
-
-    public final int COLOR_ATTACHMENT0_WEBGL = COLOR_ATTACHMENT0;
-
-    public final int COLOR_ATTACHMENT1_WEBGL = 0x8ce1;
-
-    public final int COLOR_ATTACHMENT2_WEBGL = 0x8ce2;
-
-    public final int COLOR_ATTACHMENT3_WEBGL = 0x8ce3;
-
-    public final int COLOR_ATTACHMENT4_WEBGL = 0x8ce4;
-
-    public final int COLOR_ATTACHMENT5_WEBGL = 0x8ce5;
-
-    public final int COLOR_ATTACHMENT6_WEBGL = 0x8ce6;
-
-    public final int COLOR_ATTACHMENT7_WEBGL = 0x8ce7;
-
-    public final int COLOR_ATTACHMENT8_WEBGL = 0x8ce8;
-
-    public final int COLOR_ATTACHMENT9_WEBGL = 0x8ce9;
-
-    public final int COLOR_ATTACHMENT10_WEBGL = 0x8cea;
-
-    public final int COLOR_ATTACHMENT11_WEBGL = 0x8ceb;
-
-    public final int COLOR_ATTACHMENT12_WEBGL = 0x8cec;
-
-    public final int COLOR_ATTACHMENT13_WEBGL = 0x8ced;
-
-    public final int COLOR_ATTACHMENT14_WEBGL = 0x8cee;
-
-    public final int COLOR_ATTACHMENT15_WEBGL = 0x8cef;
-
-    public final int CW = GLES20.GL_CW;
-
-    public final int CCW = GLES20.GL_CCW;
-
-    public final int FLOAT = GLES20.GL_FLOAT;
-
+    /* Uniform types */
 
     public final int FLOAT_VEC2 = GLES20.GL_FLOAT_VEC2;
 
     public final int FLOAT_VEC3 = GLES20.GL_FLOAT_VEC3;
 
     public final int FLOAT_VEC4 = GLES20.GL_FLOAT_VEC4;
-
-    public final int INT = GLES20.GL_INT;
-
 
     public final int INT_VEC2 = GLES20.GL_INT_VEC2;
 
@@ -3624,285 +3849,25 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
 
     public final int SAMPLER_CUBE = GLES20.GL_SAMPLER_CUBE;
 
-    public final int STATIC_DRAW = GLES20.GL_STATIC_DRAW;
+    /* Uniform types */
 
-    public final int DYNAMIC_DRAW = GLES20.GL_DYNAMIC_DRAW;
+    /* Shader precision-specified types */
 
-    public final int STREAM_DRAW = GLES20.GL_STREAM_DRAW;
+    public final int LOW_FLOAT = GLES20.GL_LOW_FLOAT;
+    public final int MEDIUM_FLOAT = GLES20.GL_MEDIUM_FLOAT;
+    public final int HIGH_FLOAT = GLES20.GL_HIGH_FLOAT;
+    public final int LOW_INT = GLES20.GL_LOW_INT;
+    public final int MEDIUM_INT = GLES20.GL_MEDIUM_INT;
+    public final int HIGH_INT = GLES20.GL_HIGH_INT;
 
-    public final int NO_ERROR = GLES20.GL_NO_ERROR;
+    /* Shader precision-specified types */
 
-    public final int INVALID_VALUE = GLES20.GL_INVALID_VALUE;
 
-    public final int INVALID_OPERATION = GLES20.GL_INVALID_OPERATION;
+    /* Framebuffers and renderbuffers */
 
-    public final int INVALID_FRAMEBUFFER_OPERATION = GLES20.GL_INVALID_FRAMEBUFFER_OPERATION;
+    public final int FRAMEBUFFER = GLES20.GL_FRAMEBUFFER;
 
-    public final int OUT_OF_MEMORY = GLES20.GL_OUT_OF_MEMORY;
-
-    public final int CONTEXT_LOST_WEBGL = 0x9242;
-
-    public final int FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE = GLES20.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE;
-
-    public final int FRAMEBUFFER_ATTACHMENT_OBJECT_NAME = GLES20.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME;
-
-    public final int FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL = GLES20.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL;
-
-    public final int FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE = GLES20.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE;
-
-    public final int FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING_EXT = 0x8210;
-
-    public final int ACTIVE_TEXTURE = GLES20.GL_ACTIVE_TEXTURE;
-
-    public final int ALIASED_LINE_WIDTH_RANGE = GLES20.GL_ALIASED_LINE_WIDTH_RANGE;
-
-    public final int ALIASED_POINT_SIZE_RANGE = GLES20.GL_ALIASED_POINT_SIZE_RANGE;
-
-    public final int ALPHA_BITS = GLES20.GL_ALPHA_BITS;
-
-    public final int ARRAY_BUFFER_BINDING = GLES20.GL_ARRAY_BUFFER_BINDING;
-
-    public final int BLEND_COLOR = GLES20.GL_BLEND_COLOR;
-
-    public final int BLEND_DST_ALPHA = GLES20.GL_BLEND_DST_ALPHA;
-
-    public final int BLEND_DST_RGB = GLES20.GL_BLEND_DST_RGB;
-
-    public final int BLEND_EQUATION = GLES20.GL_BLEND_EQUATION;
-
-    public final int BLEND_EQUATION_ALPHA = GLES20.GL_BLEND_EQUATION_ALPHA;
-
-    public final int BLEND_EQUATION_RGB = GLES20.GL_BLEND_EQUATION_RGB;
-
-    public final int BLEND_SRC_ALPHA = GLES20.GL_BLEND_SRC_ALPHA;
-
-    public final int BLEND_SRC_RGB = GLES20.GL_BLEND_SRC_RGB;
-
-    public final int BLUE_BITS = GLES20.GL_BLUE_BITS;
-
-    public final int COLOR_CLEAR_VALUE = GLES20.GL_COLOR_CLEAR_VALUE;
-
-    public final int COLOR_WRITEMASK = GLES20.GL_COLOR_WRITEMASK;
-
-    public final int COMPRESSED_TEXTURE_FORMATS = GLES20.GL_COMPRESSED_TEXTURE_FORMATS;
-
-    public final int CULL_FACE_MODE = GLES20.GL_CULL_FACE_MODE;
-
-    public final int CURRENT_PROGRAM = GLES20.GL_CURRENT_PROGRAM;
-
-    public final int DEPTH_BITS = GLES20.GL_DEPTH_BITS;
-
-    public final int DEPTH_CLEAR_VALUE = GLES20.GL_DEPTH_CLEAR_VALUE;
-
-    public final int DEPTH_FUNC = GLES20.GL_DEPTH_FUNC;
-
-    public final int DEPTH_RANGE = GLES20.GL_DEPTH_RANGE;
-
-    public final int DEPTH_WRITEMASK = GLES20.GL_DEPTH_WRITEMASK;
-
-    public final int ELEMENT_ARRAY_BUFFER_BINDING = GLES20.GL_ELEMENT_ARRAY_BUFFER_BINDING;
-
-    public final int FRAMEBUFFER_BINDING = GLES20.GL_FRAMEBUFFER_BINDING;
-
-    public final int FRONT_FACE = GLES20.GL_FRONT_FACE;
-
-    public final int GENERATE_MIPMAP_HINT = GLES20.GL_GENERATE_MIPMAP_HINT;
-
-    public final int GREEN_BITS = GLES20.GL_GREEN_BITS;
-
-    public final int IMPLEMENTATION_COLOR_READ_FORMAT = GLES20.GL_IMPLEMENTATION_COLOR_READ_FORMAT;
-
-    public final int IMPLEMENTATION_COLOR_READ_TYPE = GLES20.GL_IMPLEMENTATION_COLOR_READ_TYPE;
-
-    public final int LINE_WIDTH = GLES20.GL_LINE_WIDTH;
-
-    public final int MAX_COMBINED_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS;
-
-
-    public final int MAX_CUBE_MAP_TEXTURE_SIZE = GLES20.GL_MAX_CUBE_MAP_TEXTURE_SIZE;
-
-    public final int MAX_FRAGMENT_UNIFORM_VECTORS = GLES20.GL_MAX_FRAGMENT_UNIFORM_VECTORS;
-
-    public final int MAX_RENDERBUFFER_SIZE = GLES20.GL_MAX_RENDERBUFFER_SIZE;
-
-    public final int MAX_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_TEXTURE_IMAGE_UNITS;
-
-    public final int MAX_TEXTURE_SIZE = GLES20.GL_MAX_TEXTURE_SIZE;
-
-    public final int MAX_VARYING_VECTORS = GLES20.GL_MAX_VARYING_VECTORS;
-
-    public final int MAX_VERTEX_ATTRIBS = GLES20.GL_MAX_VERTEX_ATTRIBS;
-
-    public final int MAX_VERTEX_TEXTURE_IMAGE_UNITS = GLES20.GL_MAX_VERTEX_TEXTURE_IMAGE_UNITS;
-
-    public final int MAX_VERTEX_UNIFORM_VECTORS = GLES20.GL_MAX_VERTEX_UNIFORM_VECTORS;
-
-    public final int MAX_VIEWPORT_DIMS = GLES20.GL_MAX_VIEWPORT_DIMS;
-
-    public final int PACK_ALIGNMENT = GLES20.GL_PACK_ALIGNMENT;
-
-    public final int POLYGON_OFFSET_FACTOR = GLES20.GL_POLYGON_OFFSET_FACTOR;
-
-    public final int POLYGON_OFFSET_UNITS = GLES20.GL_POLYGON_OFFSET_UNITS;
-
-    public final int RED_BITS = GLES20.GL_RED_BITS;
-
-    public final int RENDERBUFFER_BINDING = GLES20.GL_RENDERBUFFER_BINDING;
-
-    public final int RENDERER = GLES20.GL_RENDERER;
-
-    public final int SAMPLE_BUFFERS = GLES20.GL_SAMPLE_BUFFERS;
-
-    public final int SAMPLES = GLES20.GL_SAMPLES;
-
-
-    public final int STENCIL_BACK_FAIL = GLES20.GL_STENCIL_BACK_FAIL;
-
-
-    public final int STENCIL_BACK_FUNC = GLES20.GL_STENCIL_BACK_FUNC;
-
-    public final int STENCIL_BACK_PASS_DEPTH_FAIL = GLES20.GL_STENCIL_BACK_PASS_DEPTH_FAIL;
-
-    public final int STENCIL_BACK_PASS_DEPTH_PASS = GLES20.GL_STENCIL_BACK_PASS_DEPTH_PASS;
-
-
-    public final int STENCIL_BACK_REF = GLES20.GL_STENCIL_BACK_REF;
-
-
-    public final int STENCIL_BACK_VALUE_MASK = GLES20.GL_STENCIL_BACK_VALUE_MASK;
-
-    public final int STENCIL_BACK_WRITEMASK = GLES20.GL_STENCIL_BACK_WRITEMASK;
-
-    public final int STENCIL_BITS = GLES20.GL_STENCIL_BITS;
-
-
-    public final int STENCIL_CLEAR_VALUE = GLES20.GL_STENCIL_CLEAR_VALUE;
-
-
-    public final int STENCIL_FAIL = GLES20.GL_STENCIL_FAIL;
-
-    public final int STENCIL_FUNC = GLES20.GL_STENCIL_FUNC;
-
-    public final int STENCIL_PASS_DEPTH_FAIL = GLES20.GL_STENCIL_PASS_DEPTH_FAIL;
-
-
-    public final int STENCIL_PASS_DEPTH_PASS = GLES20.GL_STENCIL_PASS_DEPTH_PASS;
-
-
-    public final int STENCIL_REF = GLES20.GL_STENCIL_REF;
-
-    public final int STENCIL_VALUE_MASK = GLES20.GL_STENCIL_VALUE_MASK;
-
-    public final int STENCIL_WRITEMASK = GLES20.GL_STENCIL_WRITEMASK;
-
-
-    public final int SUBPIXEL_BITS = GLES20.GL_SUBPIXEL_BITS;
-
-
-    public final int TEXTURE_BINDING_2D = GLES20.GL_TEXTURE_BINDING_2D;
-
-
-    public final int TEXTURE_BINDING_CUBE_MAP = GLES20.GL_TEXTURE_BINDING_CUBE_MAP;
-
-    public final int SAMPLE_COVERAGE_INVERT = GLES20.GL_SAMPLE_COVERAGE_INVERT;
-
-
-    public final int SAMPLE_COVERAGE_VALUE = GLES20.GL_SAMPLE_COVERAGE_VALUE;
-
-
-    public final int SCISSOR_BOX = GLES20.GL_SCISSOR_BOX;
-
-    public final int SHADING_LANGUAGE_VERSION = GLES20.GL_SHADING_LANGUAGE_VERSION;
-
-    public final int UNPACK_ALIGNMENT = GLES20.GL_UNPACK_ALIGNMENT;
-
-    public final int UNPACK_COLORSPACE_CONVERSION_WEBGL = 0x9243;
-
-    public final int UNPACK_FLIP_Y_WEBGL = 0x9240;
-
-    public final int UNPACK_PREMULTIPLY_ALPHA_WEBGL = 0x9241;
-
-    public final int VIEWPORT = GLES20.GL_VIEWPORT;
-
-    public final int VENDOR = GLES20.GL_VENDOR;
-
-    public final int VERSION = GLES20.GL_VERSION;
-
-
-    public final int DELETE_STATUS = GLES20.GL_DELETE_STATUS;
-
-    public final int LINK_STATUS = GLES20.GL_LINK_STATUS;
-
-    public final int VALIDATE_STATUS = GLES20.GL_VALIDATE_STATUS;
-
-    public final int ATTACHED_SHADERS = GLES20.GL_ATTACHED_SHADERS;
-
-    public final int ACTIVE_ATTRIBUTES = GLES20.GL_ACTIVE_ATTRIBUTES;
-
-    public final int ACTIVE_UNIFORMS = GLES20.GL_ACTIVE_UNIFORMS;
-
-    public final int RENDERBUFFER_WIDTH = GLES20.GL_RENDERBUFFER_WIDTH;
-
-
-    public final int RENDERBUFFER_HEIGHT = GLES20.GL_RENDERBUFFER_HEIGHT;
-
-    public final int RENDERBUFFER_INTERNAL_FORMAT = GLES20.GL_RENDERBUFFER_INTERNAL_FORMAT;
-
-    public final int RENDERBUFFER_GREEN_SIZE = GLES20.GL_RENDERBUFFER_GREEN_SIZE;
-
-    public final int RENDERBUFFER_BLUE_SIZE = GLES20.GL_RENDERBUFFER_BLUE_SIZE;
-
-    public final int RENDERBUFFER_RED_SIZE = GLES20.GL_RENDERBUFFER_RED_SIZE;
-
-    public final int RENDERBUFFER_ALPHA_SIZE = GLES20.GL_RENDERBUFFER_ALPHA_SIZE;
-
-    public final int RENDERBUFFER_DEPTH_SIZE = GLES20.GL_RENDERBUFFER_DEPTH_SIZE;
-
-    public final int RENDERBUFFER_STENCIL_SIZE = GLES20.GL_RENDERBUFFER_STENCIL_SIZE;
-
-    public final int COMPILE_STATUS = GLES20.GL_COMPILE_STATUS;
-
-    public final int SHADER_TYPE = GLES20.GL_SHADER_TYPE;
-
-    public final int TEXTURE_MAG_FILTER = GLES20.GL_TEXTURE_MAG_FILTER;
-
-    public final int TEXTURE_MIN_FILTER = GLES20.GL_TEXTURE_MIN_FILTER;
-
-    public final int TEXTURE_WRAP_S = GLES20.GL_TEXTURE_WRAP_S;
-
-    public final int TEXTURE_WRAP_T = GLES20.GL_TEXTURE_WRAP_T;
-
-    public final int TEXTURE_MAX_ANISOTROPY_EXT = 0x84FE;
-
-    public final int VERTEX_ATTRIB_ARRAY_BUFFER_BINDING = GLES20.GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING;
-
-    public final int VERTEX_ATTRIB_ARRAY_ENABLED = GLES20.GL_VERTEX_ATTRIB_ARRAY_ENABLED;
-
-    public final int VERTEX_ATTRIB_ARRAY_SIZE = GLES20.GL_VERTEX_ATTRIB_ARRAY_SIZE;
-
-    public final int VERTEX_ATTRIB_ARRAY_STRIDE = GLES20.GL_VERTEX_ATTRIB_ARRAY_STRIDE;
-
-    public final int VERTEX_ATTRIB_ARRAY_TYPE = GLES20.GL_VERTEX_ATTRIB_ARRAY_TYPE;
-
-    public final int VERTEX_ATTRIB_ARRAY_NORMALIZED = GLES20.GL_VERTEX_ATTRIB_ARRAY_NORMALIZED;
-
-    public final int CURRENT_VERTEX_ATTRIB = GLES20.GL_CURRENT_VERTEX_ATTRIB;
-
-    public final int VERTEX_ATTRIB_ARRAY_POINTER = GLES20.GL_VERTEX_ATTRIB_ARRAY_POINTER;
-
-    public final int FRAGMENT_SHADER_DERIVATIVE_HINT_OES = 0x8B8B;
-
-    public final int DONT_CARE = GLES20.GL_DONT_CARE;
-
-    public final int FASTEST = GLES20.GL_FASTEST;
-
-    public final int NICEST = GLES20.GL_NICEST;
-
-    public final int UNSIGNED_SHORT_5_6_5 = GLES20.GL_UNSIGNED_SHORT_5_6_5;
-
-    public final int UNSIGNED_SHORT_4_4_4_4 = GLES20.GL_UNSIGNED_SHORT_4_4_4_4;
-
-    public final int UNSIGNED_SHORT_5_5_5_1 = GLES20.GL_UNSIGNED_SHORT_5_5_5_1;
+    public final int RENDERBUFFER = GLES20.GL_RENDERBUFFER;
 
     public final int RGBA4 = GLES20.GL_RGBA4;
 
@@ -3916,51 +3881,69 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
 
     public final int DEPTH_STENCIL = 0x84F9;
 
-    public final int RGBA32F_EXT = 0x8814;
+    public final int RENDERBUFFER_WIDTH = GLES20.GL_RENDERBUFFER_WIDTH;
 
-    public final int RGB32F_EXT = 0x8815;
+    public final int RENDERBUFFER_HEIGHT = GLES20.GL_RENDERBUFFER_HEIGHT;
 
-    public final int SRGB8_ALPHA8_EXT = 0x8C43;
+    public final int RENDERBUFFER_INTERNAL_FORMAT = GLES20.GL_RENDERBUFFER_INTERNAL_FORMAT;
 
-    public final int KEEP = GLES20.GL_KEEP;
+    public final int RENDERBUFFER_RED_SIZE = GLES20.GL_RENDERBUFFER_RED_SIZE;
 
-    public final int REPLACE = GLES20.GL_REPLACE;
+    public final int RENDERBUFFER_GREEN_SIZE = GLES20.GL_RENDERBUFFER_GREEN_SIZE;
 
-    public final int INCR = GLES20.GL_INCR;
+    public final int RENDERBUFFER_BLUE_SIZE = GLES20.GL_RENDERBUFFER_BLUE_SIZE;
 
-    public final int INCR_WRAP = GLES20.GL_INCR_WRAP;
+    public final int RENDERBUFFER_ALPHA_SIZE = GLES20.GL_RENDERBUFFER_ALPHA_SIZE;
 
-    public final int DECR = GLES20.GL_DECR;
+    public final int RENDERBUFFER_DEPTH_SIZE = GLES20.GL_RENDERBUFFER_DEPTH_SIZE;
 
-    public final int DECR_WRAP = GLES20.GL_DECR_WRAP;
+    public final int RENDERBUFFER_STENCIL_SIZE = GLES20.GL_RENDERBUFFER_STENCIL_SIZE;
 
-    public final int INVERT = GLES20.GL_INVERT;
+    public final int FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE = GLES20.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE;
 
-    public final int REPEAT = GLES20.GL_REPEAT;
+    public final int FRAMEBUFFER_ATTACHMENT_OBJECT_NAME = GLES20.GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME;
 
-    public final int CLAMP_TO_EDGE = GLES20.GL_CLAMP_TO_EDGE;
+    public final int FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL = GLES20.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL;
 
-    public final int MIRRORED_REPEAT = GLES20.GL_MIRRORED_REPEAT;
+    public final int FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE = GLES20.GL_FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE;
 
-    public final int LINEAR = GLES20.GL_LINEAR;
+    public final int COLOR_ATTACHMENT0 = GLES20.GL_COLOR_ATTACHMENT0;
 
-    public final int NEAREST = GLES20.GL_NEAREST;
+    public final int DEPTH_ATTACHMENT = GLES20.GL_DEPTH_ATTACHMENT;
 
-    public final int NEAREST_MIPMAP_NEAREST = GLES20.GL_NEAREST_MIPMAP_NEAREST;
+    public final int STENCIL_ATTACHMENT = GLES20.GL_STENCIL_ATTACHMENT;
 
-    public final int LINEAR_MIPMAP_NEAREST = GLES20.GL_LINEAR_MIPMAP_NEAREST;
-
-    public final int NEAREST_MIPMAP_LINEAR = GLES20.GL_NEAREST_MIPMAP_LINEAR;
-
-    public final int LINEAR_MIPMAP_LINEAR = GLES20.GL_LINEAR_MIPMAP_LINEAR;
-
-    public final int BROWSER_DEFAULT_WEBGL = 0x9244;
+    public final int DEPTH_STENCIL_ATTACHMENT = 0x821A;
 
     public final int NONE = GLES20.GL_NONE;
 
-    public final int HALF_FLOAT = 0x140B;
+    public final int FRAMEBUFFER_COMPLETE = GLES20.GL_FRAMEBUFFER_COMPLETE;
 
-    public final int MIN_EXT = Constants.GL_MIN_EXT;
+    public final int FRAMEBUFFER_INCOMPLETE_ATTACHMENT = GLES20.GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
 
-    public final int MAX_EXT = Constants.GL_MAX_EXT;
+    public final int FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT = GLES20.GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
+
+    public final int FRAMEBUFFER_INCOMPLETE_DIMENSIONS = GLES20.GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
+
+    public final int FRAMEBUFFER_UNSUPPORTED = GLES20.GL_FRAMEBUFFER_UNSUPPORTED;
+
+    public final int FRAMEBUFFER_BINDING = GLES20.GL_FRAMEBUFFER_BINDING;
+
+    public final int RENDERBUFFER_BINDING = GLES20.GL_RENDERBUFFER_BINDING;
+
+    public final int MAX_RENDERBUFFER_SIZE = GLES20.GL_MAX_RENDERBUFFER_SIZE;
+
+    //public final int INVALID_FRAMEBUFFER_OPERATION = GLES20.GL_INVALID_FRAMEBUFFER_OPERATION;
+
+    /* Framebuffers and renderbuffers */
+
+    /* Pixel storage modes */
+
+    public final int UNPACK_COLORSPACE_CONVERSION_WEBGL = 0x9243;
+
+    public final int UNPACK_FLIP_Y_WEBGL = 0x9240;
+
+    public final int UNPACK_PREMULTIPLY_ALPHA_WEBGL = 0x9241;
+
+    /* Pixel storage modes */
 }
