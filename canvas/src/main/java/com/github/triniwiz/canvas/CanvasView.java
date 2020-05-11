@@ -109,7 +109,6 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         }
         if (!isLibraryLoaded) {
             System.loadLibrary("canvasnative");
-            System.loadLibrary("canvasextras");
             isLibraryLoaded = true;
         }
         glSurfaceView = new GLTextureView(context, attrs);
@@ -121,10 +120,8 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 24, 8);
         if (detectOpenGLES30() && !isEmulator()) {
             glSurfaceView.setEGLContextClientVersion(3);
-            glVersion = 3;
         } else {
             glSurfaceView.setEGLContextClientVersion(2);
-            glVersion = 2;
         }
         glSurfaceView.setRenderer(this);
         // glSurfaceView.getHolder().addCallback(this);
