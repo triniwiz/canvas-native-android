@@ -18,4 +18,5 @@ public enum CanvasTextAlignment {
     @Override
     public String toString() {
         return textAlign;
-    }}
+    }
+}

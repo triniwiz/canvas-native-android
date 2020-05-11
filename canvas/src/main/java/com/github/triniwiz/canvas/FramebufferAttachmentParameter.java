@@ -8,7 +8,9 @@ public class FramebufferAttachmentParameter {
     boolean isRenderbuffer = false;
     int value = 0;
 
-    public FramebufferAttachmentParameter() {}
+    public FramebufferAttachmentParameter() {
+    }
+
     public FramebufferAttachmentParameter(boolean isTexture, boolean isRenderbuffer, int value) {
         this.isTexture = isTexture;
         this.isRenderbuffer = isRenderbuffer;

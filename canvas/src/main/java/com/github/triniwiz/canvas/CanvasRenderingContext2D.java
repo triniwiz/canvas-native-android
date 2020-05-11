@@ -82,15 +82,15 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeDrawImage(long canvas, Bitmap image, float dx, float dy);
 
-    private static native long nativeDrawImageRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy);
+    private static native long nativeDrawImageRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy);
 
     private static native long nativeDrawImageDw(long canvas, Bitmap image, float dx, float dy, float dWidth, float dHeight);
 
-    private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
+    private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeDrawImageSw(long canvas, Bitmap image, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
-    private static native long nativeDrawImageSwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
+    private static native long nativeDrawImageSwRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeClearRect(long canvas_ptr, float x, float y, float width, float height);
 
@@ -339,7 +339,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
-    public float getLineDashOffset(){
+    public float getLineDashOffset() {
         return lineDashOffset;
     }
 

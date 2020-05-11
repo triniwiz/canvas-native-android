@@ -16,4 +16,5 @@ public enum CanvasColorStyleType {
     @Override
     public String toString() {
         return type;
-    }}
+    }
+}
