@@ -595,10 +595,11 @@ class MainActivity : AppCompatActivity() {
 
        // drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
-        gl = canvas?.getContext("webgl2") as WebGLRenderingContext
+        gl = canvas?.getContext("webgl") as WebGLRenderingContext
        // drawElements(canvas!!)
+       Log.d("com.test", "ext: " +   gl!!.getExtension("ANGLE_instanced_arrays"))
 
-       drawRotatingCube(gl!!)
+      // drawRotatingCube(gl!!)
         //drawModes(canvas!!, "triangles")
        // draw(ctx!!)
 
