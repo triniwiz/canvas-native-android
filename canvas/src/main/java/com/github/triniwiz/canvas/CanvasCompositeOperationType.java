@@ -39,4 +39,5 @@ public enum CanvasCompositeOperationType {
     @Override
     public String toString() {
         return type;
-    }}
+    }
+}

@@ -85,12 +85,13 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     void clear() {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
     }
+
     @Override
     public void doFrame(long frameTimeNanos) {
         if (!handleInvalidationManually) {
             if (pendingInvalidate) {
                 flush();
-            } 
+            }
             lastCall = frameTimeNanos;
         }
         Choreographer.getInstance().postFrameCallback(this);
@@ -102,6 +103,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     private static boolean isLibraryLoaded = false;
     int glVersion;
+
     public CanvasView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         if (isInEditMode()) {
@@ -287,6 +289,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     WebGLRenderingContext webGLRenderingContext;
     WebGL2RenderingContext webGL2RenderingContext;
+
     public @Nullable
     CanvasRenderingContext getContext(String type) {
         if (type.equals("2d")) {
@@ -301,13 +304,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             }
             isWebGL = true;
             return webGLRenderingContext;
-        }
-        else if (type.equals("webgl2")) {
+        } else if (type.equals("webgl2")) {
             if (webGL2RenderingContext == null) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     webGL2RenderingContext = new WebGL2RenderingContext(this);
                     isWebGL = true;
-                }else {
+                } else {
                     isWebGL = false;
                     return null;
                 }
@@ -358,10 +360,13 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     int renderCount = 0;
     boolean wasDestroyed = false;
     boolean isWebGL = false;
+
     static class Size {
         int width;
         int height;
-        Size(int width, int height){}
+
+        Size(int width, int height) {
+        }
 
         public int getHeight() {
             return height;
@@ -371,6 +376,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             return width;
         }
     }
+
     Size lastSize;
     Size newSize;
 

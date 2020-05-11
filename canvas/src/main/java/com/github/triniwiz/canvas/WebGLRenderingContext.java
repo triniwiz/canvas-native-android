@@ -1023,7 +1023,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     GLES30.glDrawArraysInstanced(mode, first, count, 1);
-                }else {
+                } else {
                     GLES20.glDrawArrays(mode, first, count);
                 }
 
@@ -1043,7 +1043,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                     GLES30.glDrawElementsInstanced(mode, count, type, offset, 1);
-                }else {
+                } else {
                     GLES20.glDrawElements(mode, count, type, offset);
                 }
 
