@@ -9,7 +9,7 @@ if(${ANDROID_PLATFORM_LEVEL} LESS 18)
 	set(GL3STUB_SRC gl3stub.c)
 	set(OPENGL_LIB GLESv2)
 else()
-	set(OPENGL_LIB GLESv2 GLESv3)
+	set(OPENGL_LIB GLESv3)
 endif()
 
 #add_library(canvasnative STATIC IMPORTED)

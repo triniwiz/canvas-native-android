@@ -33,6 +33,7 @@ import com.github.triniwiz.canvas.extensions.WEBGL_depth_texture;
 import com.github.triniwiz.canvas.extensions.WEBGL_draw_buffers;
 import com.github.triniwiz.canvas.extensions.WEBGL_lose_context;
 
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
@@ -41,6 +42,7 @@ import java.nio.ShortBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -1021,12 +1023,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    GLES30.glDrawArraysInstanced(mode, first, count, 1);
-                }else {
-                    GLES20.glDrawArrays(mode, first, count);
-                }
-
+                GLES20.glDrawArrays(mode, first, count);
                 lock.countDown();
             }
         });
@@ -1041,12 +1038,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    GLES30.glDrawElementsInstanced(mode, count, type, offset, 1);
-                }else {
-                    GLES20.glDrawElements(mode, count, type, offset);
-                }
-
+                GLES20.glDrawElements(mode, count, type, offset);
                 lock.countDown();
             }
         });
@@ -1189,12 +1181,10 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
                 byte[] name = new byte[length.get(0)];
                 int[] size = new int[1];
                 int[] type = new int[1];
-                GLES20.glGetActiveAttrib(program, index, length.get(0), null, 0, size, 0, type, 0, name, 0);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    info.name = new String(name, StandardCharsets.UTF_8);
-                } else {
-                    info.name = new String(name, Charset.forName("UTF-8"));
-                }
+                int[] nameLength = new int[1];
+                GLES20.glGetActiveAttrib(program, index, length.get(0), nameLength, 0, size, 0, type, 0, name, 0);
+                name = Arrays.copyOfRange(name, 0, nameLength[0]);
+                info.name = new String(name);
                 info.size = size[0];
                 info.type = type[0];
                 lock.countDown();
@@ -1214,17 +1204,15 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                IntBuffer length = IntBuffer.allocate(1);
+                int[] length = new int[1];
                 int[] size = new int[1];
                 int[] type = new int[1];
-                GLES20.glGetProgramiv(program, GLES20.GL_ACTIVE_UNIFORMS, length);
-                byte[] name = new byte[length.get(0)];
-                GLES20.glGetActiveUniform(program, index, length.get(0), null, 0, size, 0, type, 0, name, 0);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                    info.name = new String(name, StandardCharsets.UTF_8);
-                } else {
-                    info.name = new String(name, Charset.forName("UTF-8"));
-                }
+                GLES20.glGetProgramiv(program, GLES20.GL_ACTIVE_UNIFORM_MAX_LENGTH, length, 0);
+                byte[] name = new byte[length[0]];
+                int[] nameLength = new int[1];
+                GLES20.glGetActiveUniform(program, index, length[0], nameLength, 0, size, 0, type, 0, name, 0);
+                name = Arrays.copyOfRange(name, 0, nameLength[0]);
+                info.name = new String(name);
                 info.size = size[0];
                 info.type = type[0];
                 lock.countDown();
@@ -1244,11 +1232,11 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-                IntBuffer count = IntBuffer.allocate(1);
-                GLES20.glGetProgramiv(program, GLES20.GL_ATTACHED_SHADERS, count);
-                int[] shaders = new int[count.get(0)];
-                IntBuffer shadersBuffer = IntBuffer.wrap(shaders);
-                GLES20.glGetAttachedShaders(program, count.get(0), null, shadersBuffer);
+                int[] count = new int[1];
+                GLES20.glGetProgramiv(program, GLES20.GL_ATTACHED_SHADERS, count, 0);
+                int[] shaders = new int[count[0]];
+                int[] written = new int[1];
+                GLES20.glGetAttachedShaders(program, count[0], written, 0, shaders, 0);
                 shadersList[0] = shaders;
                 lock.countDown();
             }
@@ -1412,7 +1400,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
                 } else if (name.equals("WEBGL_depth_texture") && extensions.contains("GL_OES_depth_texture") && extensions.contains("GL_OES_packed_depth_stencil")) {
                     value[0] = new WEBGL_depth_texture();
                 } else if (name.equals("WEBGL_draw_buffers") && extensions.contains("GL_EXT_draw_buffers")) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                    if (canvas.glVersion > 2 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                         value[0] = new WEBGL_draw_buffers();
                     } else {
                         value[0] = null;
@@ -1751,19 +1739,19 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
     public WebGLShaderPrecisionFormat getShaderPrecisionFormat(final int shaderType, final int precisionType) {
         final CountDownLatch lock = new CountDownLatch(1);
         final WebGLShaderPrecisionFormat precisionFormat = new WebGLShaderPrecisionFormat();
-        final boolean[] hasError = new boolean[1];
+        //final boolean[] hasError = new boolean[1];
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
                 IntBuffer range = IntBuffer.allocate(2);
                 IntBuffer precision = IntBuffer.allocate(1);
                 GLES20.glGetShaderPrecisionFormat(shaderType, precisionType, range, precision);
-                int error = GLES20.glGetError();
-                if (error == GLES20.GL_INVALID_ENUM || error == GLES20.GL_INVALID_OPERATION) {
-                    hasError[0] = true;
-                    lock.countDown();
-                    return;
-                }
+//                int error = GLES20.glGetError();
+//                if (error == GLES20.GL_INVALID_ENUM || error == GLES20.GL_INVALID_OPERATION) {
+//                    hasError[0] = true;
+//                    lock.countDown();
+//                    return;
+//                }
                 precisionFormat.rangeMin = range.get(0);
                 precisionFormat.rangeMax = range.get(1);
                 precisionFormat.precision = precision.get(0);
@@ -1774,9 +1762,9 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             lock.await();
         } catch (InterruptedException ignored) {
         }
-        if (hasError[0]) {
+        /*if (hasError[0]) {
             return null;
-        }
+        }*/
         return precisionFormat;
     }
 
@@ -1815,7 +1803,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
         return extensions.get(0);
     }
 
-    public Object getTexParameter(final int target, final int pname) {
+    public int getTexParameter(final int target, final int pname) {
         final CountDownLatch lock = new CountDownLatch(1);
         final int[] parameters = new int[1];
         final boolean[] hasError = new boolean[1];
@@ -1824,14 +1812,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 IntBuffer params = IntBuffer.allocate(1);
                 GLES20.glGetTexParameteriv(target, pname, params);
-                int error = GLES20.glGetError();
-                if (error == GLES20.GL_INVALID_ENUM || error == GLES20.GL_INVALID_OPERATION) {
-                    hasError[0] = true;
-                    lock.countDown();
-                    return;
-                }
                 parameters[0] = params.get(0);
-
                 lock.countDown();
             }
         });
@@ -1839,9 +1820,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             lock.await();
         } catch (InterruptedException ignored) {
         }
-        if (hasError[0]) {
-            return null;
-        }
+
         return parameters[0];
     }
 
@@ -2611,7 +2590,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 byte[] raw = asset.getBytes();
                 if (flipYWebGL) {
-                    flipInPlace(raw, asset.getWidth(), asset.getHeight());
+                  //  flipInPlace(raw, asset.getWidth(), asset.getHeight());
                 }
                 GLES20.glTexImage2D(target, level, internalformat, asset.getWidth(), asset.getHeight(), 0, format, type, ByteBuffer.wrap(raw));
                 lock.countDown();

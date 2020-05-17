@@ -2,6 +2,7 @@ package com.github.triniwiz.canvas;
 
 import android.content.Context;
 import android.graphics.SurfaceTexture;
+import android.opengl.EGL14;
 import android.opengl.GLDebugHelper;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -47,6 +48,16 @@ public class GLTextureView extends TextureView
     private final static boolean LOG_RENDERER = false;
     private final static boolean LOG_RENDERER_DRAW_FRAME = false;
     private final static boolean LOG_EGL = false;
+
+    static interface Listener {
+        void didDraw();
+    }
+
+    private Listener drawListener;
+
+    public void setDrawListener(Listener drawListener) {
+        this.drawListener = drawListener;
+    }
 
     /**
      * The renderer only renders
@@ -1001,6 +1012,13 @@ public class GLTextureView extends TextureView
                 return false;
             }
 
+
+
+            EGL14.eglSurfaceAttrib(EGL14.eglGetCurrentDisplay(), EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW),
+                    EGL14.EGL_SWAP_BEHAVIOR, EGL14.EGL_BUFFER_PRESERVED);
+
+
+
             return true;
         }
 
@@ -1409,6 +1427,10 @@ public class GLTextureView extends TextureView
                     int swapError = eglHelper.swap();
                     switch (swapError) {
                         case EGL10.EGL_SUCCESS:
+                            GLTextureView view = glTextureViewWeakRef.get();
+                            if (view != null && view.drawListener != null) {
+                                view.drawListener.didDraw();;
+                            }
                             break;
                         case EGL11.EGL_CONTEXT_LOST:
                             if (LOG_SURFACE) {
