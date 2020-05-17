@@ -23,6 +23,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Size;
 import android.view.Choreographer;
+import android.view.OrientationEventListener;
 import android.view.SurfaceHolder;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
@@ -81,17 +82,23 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     Handler mainHandler;
     boolean wasPendingDraw = false;
     static long lastCall = 0;
+    ContextType contextType = ContextType.NONE;
 
     void clear() {
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+            }
+        });
     }
+
     @Override
     public void doFrame(long frameTimeNanos) {
         if (!handleInvalidationManually) {
             if (pendingInvalidate) {
                 flush();
-            } 
-            lastCall = frameTimeNanos;
+            }
         }
         Choreographer.getInstance().postFrameCallback(this);
     }
@@ -102,7 +109,10 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     private static boolean isLibraryLoaded = false;
     int glVersion;
-    public CanvasView(Context context, @Nullable AttributeSet attrs) {
+
+    int previousOrientation = 0;
+
+    public CanvasView(final Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
         if (isInEditMode()) {
             return;
@@ -118,7 +128,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         mainHandler = new Handler(Looper.getMainLooper());
         ctx = context;
         scale = context.getResources().getDisplayMetrics().density;
-        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 24, 8);
+        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 8);
         if (detectOpenGLES30() && !isEmulator()) {
             glSurfaceView.setEGLContextClientVersion(3);
             glVersion = 3;
@@ -127,15 +137,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             glVersion = 2;
         }
         glSurfaceView.setRenderer(this);
-        // glSurfaceView.getHolder().addCallback(this);
-        //glSurfaceView.getHolder().setFormat(PixelFormat.TRANSPARENT);
+        glSurfaceView.setOpaque(false);
         glSurfaceView.setRenderMode(GLTextureView.RENDERMODE_WHEN_DIRTY);
-        //glSurfaceView.setZOrderOnTop(false);
         glSurfaceView.setLayoutParams(
                 new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         );
-
-        //  CanvasView.this.setForeground(new ColorDrawable(Color.WHITE));
+        glSurfaceView.setPreserveEGLContextOnPause(true);
         addView(glSurfaceView);
     }
 
@@ -145,6 +152,9 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     private boolean detectOpenGLES30() {
         ActivityManager am =
                 (ActivityManager) getContext().getSystemService(Context.ACTIVITY_SERVICE);
+        if (am == null) {
+            return false;
+        }
         ConfigurationInfo info = am.getDeviceConfigurationInfo();
         return (info.reqGlEsVersion >= 0x30000);
     }
@@ -165,6 +175,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
+        Log.d("com.test", "finalize ?????");
         if (canvas != 0) {
             destroy();
         }
@@ -287,33 +298,43 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     WebGLRenderingContext webGLRenderingContext;
     WebGL2RenderingContext webGL2RenderingContext;
+
+    enum ContextType {
+        NONE,
+        CANVAS,
+        WEBGL
+    }
+
     public @Nullable
     CanvasRenderingContext getContext(String type) {
-        if (type.equals("2d")) {
-            if (renderingContext2d == null) {
-                renderingContext2d = new CanvasRenderingContext2D(this);
-            }
-            isWebGL = false;
-            return renderingContext2d;
-        } else if (type.equals("webgl")) {
-            if (webGLRenderingContext == null) {
-                webGLRenderingContext = new WebGLRenderingContext(this);
-            }
-            isWebGL = true;
-            return webGLRenderingContext;
-        }
-        else if (type.equals("webgl2")) {
-            if (webGL2RenderingContext == null) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
-                    webGL2RenderingContext = new WebGL2RenderingContext(this);
-                    isWebGL = true;
-                }else {
-                    isWebGL = false;
-                    return null;
+        switch (type) {
+            case "2d":
+                if (renderingContext2d == null) {
+                    renderingContext2d = new CanvasRenderingContext2D(this);
                 }
-            }
-            return webGL2RenderingContext;
+                contextType = ContextType.CANVAS;
+                return renderingContext2d;
+            case "webgl":
+                if (webGLRenderingContext == null) {
+                    webGLRenderingContext = new WebGLRenderingContext(this);
+                }
+                contextType = ContextType.WEBGL;
+                return webGLRenderingContext;
+            case "webgl2":
+                if (webGL2RenderingContext == null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
+                        webGL2RenderingContext = new WebGL2RenderingContext(this);
+                        isWebGL = true;
+                    } else {
+                        isWebGL = false;
+                        contextType = ContextType.NONE;
+                        return null;
+                    }
+                }
+                contextType = ContextType.WEBGL;
+                return webGL2RenderingContext;
         }
+        contextType = ContextType.NONE;
         return null;
     }
 
@@ -350,6 +371,24 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     @Override
     public void onSurfaceCreated(GL10 gl, javax.microedition.khronos.egl.EGLConfig config) {
+        mainHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (listener != null) {
+                    listener.contextReady();
+                }
+            }
+        });
+    }
+
+    public interface Listener {
+        public void contextReady();
+    }
+
+    Listener listener;
+
+    public void setListener(Listener listener) {
+        this.listener = listener;
     }
 
     int mWidth = -1;
@@ -358,10 +397,15 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     int renderCount = 0;
     boolean wasDestroyed = false;
     boolean isWebGL = false;
+
     static class Size {
         int width;
         int height;
-        Size(int width, int height){}
+
+        Size(int width, int height) {
+            this.width = width;
+            this.height = height;
+        }
 
         public int getHeight() {
             return height;
@@ -371,12 +415,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             return width;
         }
     }
+
     Size lastSize;
     Size newSize;
 
     @Override
     public void onSurfaceChanged(GL10 gl, final int width, final int height) {
-        GLES20.glViewport(0, 0, width, height);
         newSize = new Size(width, height);
     }
 
@@ -402,14 +446,14 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         });
     }
 
+    boolean readyEventSent = false;
+
     @Override
     public void onDrawFrame(GL10 gl) {
-        if (renderingContext2d == null && webGLRenderingContext == null) {
-            return;
-        }
-        if (!isWebGL) {
-            if (canvas == 0) {
-                GLES20.glClearColor(1F, 1F, 1F, 1F);
+        if (contextType == ContextType.CANVAS) {
+            // Move to call before flush or both ?
+            if (canvas == 0 && newSize.getWidth() != 0 && newSize.getHeight() != 0) {
+                GLES20.glViewport(0, 0, newSize.getWidth(), newSize.getHeight());
                 lastSize = newSize;
                 int[] frameBuffers = new int[1];
                 GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
@@ -417,18 +461,16 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             }
             if (lastSize != newSize) {
                 lastSize = newSize;
-                // TODO fix rotation
-               /* int[] frameBuffers = new int[1];
+                int[] frameBuffers = new int[1];
                 GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
-                canvas = CanvasView.nativeResize(canvas, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale);
-                */
+                canvas = nativeResize(canvas, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale);
             }
-            if (renderCount < 3) {
-                renderCount++;
-            }
+
             if (pendingInvalidate) {
-                // clear();
-                canvas = nativeFlush(canvas);
+                if (canvas > 0) {
+                   // clear();
+                    canvas = nativeFlush(canvas);
+                }
                 pendingInvalidate = false;
             }
         }

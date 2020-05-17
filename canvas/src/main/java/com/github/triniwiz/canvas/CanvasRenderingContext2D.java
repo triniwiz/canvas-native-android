@@ -12,6 +12,7 @@ import android.opengl.GLES20;
 public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private boolean imageSmoothingEnabled = false;
+
     private ImageSmoothingQuality imageSmoothingQuality = ImageSmoothingQuality.Low;
 
     private static native long nativeRect(long canvas_ptr, float x, float y, float width, float height);
@@ -82,15 +83,15 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeDrawImage(long canvas, Bitmap image, float dx, float dy);
 
-    private static native long nativeDrawImageRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy);
+    private static native long nativeDrawImageRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy);
 
     private static native long nativeDrawImageDw(long canvas, Bitmap image, float dx, float dy, float dWidth, float dHeight);
 
-    private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
+    private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeDrawImageSw(long canvas, Bitmap image, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
-    private static native long nativeDrawImageSwRaw(long canvas, byte[] pixels,int originalWidth, int originalHeight, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
+    private static native long nativeDrawImageSwRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeClearRect(long canvas_ptr, float x, float y, float width, float height);
 
@@ -137,6 +138,10 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     private static native long nativeSetMiterLimit(long canvas, float limit);
 
     private static native CanvasTextMetrics nativeMeasureText(long canvas, String text);
+
+    private static native long nativeSetCurrentTransform(long canvas, long matrix);
+
+    private static native long nativeGetCurrentTransform(long canvas);
 
     private CanvasView canvasView;
 
@@ -339,7 +344,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
-    public float getLineDashOffset(){
+    public float getLineDashOffset() {
         return lineDashOffset;
     }
 
@@ -1016,4 +1021,18 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             }
         });
     }
+
+    public void setCurrentTransform(CanvasDOMMatrix matrix) {
+        nativeSetCurrentTransform(canvasView.canvas, matrix.matrix);
+    }
+
+    public CanvasDOMMatrix getCurrentTransform() {
+        long matrix = nativeGetCurrentTransform(canvasView.canvas);
+        if (matrix == 0) {
+            return new CanvasDOMMatrix();
+        }
+        return new CanvasDOMMatrix(matrix);
+    }
+
+
 }

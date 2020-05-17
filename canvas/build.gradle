@@ -10,7 +10,7 @@ buildscript {
 ext {
     PUBLISH_GROUP_ID = 'com.github.triniwiz'
     PUBLISH_ARTIFACT_ID = 'canvas'
-    PUBLISH_VERSION = '0.4.0'
+    PUBLISH_VERSION = '0.5.0'
 }
 
 
@@ -60,7 +60,7 @@ publish {
     userOrg = 'triniwiz'
     groupId = 'com.github.triniwiz'
     artifactId = 'canvas'
-    publishVersion = '0.4.0'
+    publishVersion = '0.5.0'
     desc = ''
     website = ''
 }

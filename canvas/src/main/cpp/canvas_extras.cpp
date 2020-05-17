@@ -6,16 +6,17 @@
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_github_triniwiz_canvas_WebGLRenderingContext_nativeGetVertexAttribOffset(JNIEnv *env,
-                                                                            jobject object,
-                                                                            jint index,
-                                                                            jint pname,
-                                                                            jobject buffer) {
+                                                                                  jobject object,
+                                                                                  jint index,
+                                                                                  jint pname,
+                                                                                  jobject buffer) {
     void *ptr = env->GetDirectBufferAddress(buffer);
     void **p = &ptr;
     glGetVertexAttribPointerv(static_cast<GLuint>(index), static_cast<GLenum>(pname), p);
 }
 
 extern "C" JNIEXPORT void JNICALL
-        Java_com_github_triniwiz_canvas_WebGLRenderingContext_nativeBindBuffer(JNIEnv *env, jobject object, jint target, jint buffer){
+Java_com_github_triniwiz_canvas_WebGLRenderingContext_nativeBindBuffer(JNIEnv *env, jobject object,
+                                                                       jint target, jint buffer) {
     glBindBuffer(static_cast<GLenum>(target), static_cast<GLuint>(buffer));
 }

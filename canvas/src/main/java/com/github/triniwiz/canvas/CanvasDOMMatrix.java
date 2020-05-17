@@ -26,6 +26,11 @@ public class CanvasDOMMatrix {
         refreshMatrix();
     }
 
+    CanvasDOMMatrix(long matrix) {
+        this.matrix = matrix;
+        refreshMatrix();
+    }
+
     private void updateMatrix() {
         float[] values = {a, b, c, d, e, f};
         nativeSetMatrix(matrix, values);

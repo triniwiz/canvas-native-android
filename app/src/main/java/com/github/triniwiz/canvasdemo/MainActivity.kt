@@ -116,7 +116,7 @@ class MainActivity : AppCompatActivity() {
     fun solarAnimation(ctx: CanvasRenderingContext2D) {
         AnimationFrame.requestAnimationFrame { called ->
             run {
-                animateSolarSystem(ctx, called)
+                animateSolarSystem(ctx, called.toFloat())
             }
         }
     }
@@ -345,7 +345,7 @@ class MainActivity : AppCompatActivity() {
 
             AnimationFrame.requestAnimationFrame { called ->
                 run {
-                    animateSolarSystem(ctx, called)
+                    animateSolarSystem(ctx, called.toFloat())
                 }
             }
 
@@ -356,17 +356,19 @@ class MainActivity : AppCompatActivity() {
 
 
     fun loop(ctx: CanvasRenderingContext2D, t: Float) {
-        t0 = t / 1000.0
+        Log.d("com.test", "dt " + t);
+
+        AnimationFrame.requestAnimationFrame { called ->
+            loop(ctx, called.toFloat())
+        }
+        t0 = t/ 1000.0
         a = t0 % PI2
         rr = abs(cos(a) * r)
         ctx.clearRect(0f, 0f, ctx.canvas.width.toFloat(), ctx.canvas.height.toFloat());
         val points = arrayOf(p1, p2, p3)
         drawArc(ctx, points, rr.toFloat())
         drawPoints(ctx, points)
-
-        AnimationFrame.requestAnimationFrame { called ->
-            loop(ctx, called)
-        }
+        canvas!!.flush()
     }
 
     fun getImageData(ctx: CanvasRenderingContext2D) {
@@ -567,8 +569,9 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("NewApi")
     fun drawFill(view: View) {
-      //  ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
-        //ballExample(ctx!!)
+        ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
+      //  ctx?.fillRect(0F,0F,200f,200f)
+      //  ballExample(ctx!!)
         /* ctx?.fillStyle = CanvasColorStyle.Color(Color.BLUE)
          ctx?.clearRect(0F,0F, canvas!!.width.toFloat(), canvas!!.height.toFloat())
          ctx?.fillRect(0F,0F,200f,200f)
@@ -579,7 +582,7 @@ class MainActivity : AppCompatActivity() {
          },null,4000)*/
        // drawHouse(ctx!!)
         //drawSVG(svgView!!)
-      //  drawHouse(ctx!!)
+        //drawHouse(ctx!!)
         /*canvasView.toDataURLAsync {
             Log.d("com.test", "aaaa: " + it)
         }
@@ -595,9 +598,9 @@ class MainActivity : AppCompatActivity() {
 
        // drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
-        gl = canvas?.getContext("webgl") as WebGLRenderingContext
-       // drawElements(canvas!!)
-       Log.d("com.test", "ext: " +   gl!!.getExtension("ANGLE_instanced_arrays"))
+      //  gl = canvas?.getContext("webgl") as WebGLRenderingContext
+        //drawElements(canvas!!)
+     //  Log.d("com.test", "ext: " +   gl!!.getExtension("ANGLE_instanced_arrays"))
 
       // drawRotatingCube(gl!!)
         //drawModes(canvas!!, "triangles")
@@ -611,8 +614,8 @@ class MainActivity : AppCompatActivity() {
       // draw(ctx!!)
 
        // canvas?.flush()
-
-      //  loop(ctx!!,0)
+        canvas?.isHandleInvalidationManually = true
+      loop(ctx!!, 0F)
         /*val data = canvas!!.toDataURL();
         Log.d("com.test", "url: " + data)
 
@@ -779,7 +782,7 @@ class MainActivity : AppCompatActivity() {
 
 
         AnimationFrame.requestAnimationFrame {
-            cubeRotationAnimation(gl, it)
+            cubeRotationAnimation(gl, it.toFloat())
         }
 
     }

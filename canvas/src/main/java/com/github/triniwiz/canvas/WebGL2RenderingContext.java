@@ -14,6 +14,7 @@ import java.nio.IntBuffer;
 import java.nio.LongBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 
@@ -1068,18 +1069,13 @@ public class WebGL2RenderingContext extends WebGLRenderingContext {
                 int[] size = new int[1];
                 int[] type = new int[1];
                 GLES30.glGetTransformFeedbackVarying(program, index, maxNameLength[0], length, 0, size, 0, type, 0, name, 0);
-
                 if (length[0] == 0 || size[0] == 0 || type[0] == 0) {
                     info[0] = null;
                     return;
                 }
 
-                String nameValue;
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
-                    nameValue = new String(name, StandardCharsets.UTF_8);
-                } else {
-                    nameValue = new String(name, Charset.forName("UTF-8"));
-                }
+                name = Arrays.copyOfRange(name, 0, length[0]);
+                String nameValue = new String(name);
                 info[0] = new WebGLActiveInfo(nameValue, size[0], type[0]);
                 lock.countDown();
             }
