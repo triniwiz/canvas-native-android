@@ -305,6 +305,21 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         WEBGL
     }
 
+    private void initCanvas(){
+        queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (canvas == 0 && glSurfaceView.getWidth() > 0 && glSurfaceView.getHeight() > 0) {
+                    GLES20.glClearColor(1F, 1F, 1F, 1F);
+                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                    int[] frameBuffers = new int[1];
+                    GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
+                    canvas = nativeInit(canvas, frameBuffers[0], glSurfaceView.getWidth(), glSurfaceView.getHeight(), scale);
+                }
+            }
+        });
+    }
+
     public @Nullable
     CanvasRenderingContext getContext(String type) {
         switch (type) {
@@ -313,6 +328,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
                     renderingContext2d = new CanvasRenderingContext2D(this);
                 }
                 contextType = ContextType.CANVAS;
+                initCanvas();
                 return renderingContext2d;
             case "webgl":
                 if (webGLRenderingContext == null) {
@@ -468,7 +484,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
             if (pendingInvalidate) {
                 if (canvas > 0) {
-                   // clear();
+                    // clear();
                     canvas = nativeFlush(canvas);
                 }
                 pendingInvalidate = false;
