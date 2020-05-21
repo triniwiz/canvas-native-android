@@ -356,8 +356,6 @@ class MainActivity : AppCompatActivity() {
 
 
     fun loop(ctx: CanvasRenderingContext2D, t: Float) {
-        Log.d("com.test", "dt " + t);
-
         AnimationFrame.requestAnimationFrame { called ->
             loop(ctx, called.toFloat())
         }
@@ -368,7 +366,6 @@ class MainActivity : AppCompatActivity() {
         val points = arrayOf(p1, p2, p3)
         drawArc(ctx, points, rr.toFloat())
         drawPoints(ctx, points)
-        canvas!!.flush()
     }
 
     fun getImageData(ctx: CanvasRenderingContext2D) {
@@ -596,7 +593,7 @@ class MainActivity : AppCompatActivity() {
             Log.d("com.test", "dddd: " + it)
         }*/
 
-       // drawImageExample(ctx!!)
+        drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
       //  gl = canvas?.getContext("webgl") as WebGLRenderingContext
         //drawElements(canvas!!)
@@ -614,8 +611,7 @@ class MainActivity : AppCompatActivity() {
       // draw(ctx!!)
 
        // canvas?.flush()
-        canvas?.isHandleInvalidationManually = true
-      loop(ctx!!, 0F)
+    //  loop(ctx!!, 0F)
         /*val data = canvas!!.toDataURL();
         Log.d("com.test", "url: " + data)
 
