@@ -5,6 +5,8 @@ import android.graphics.Color;
 import android.opengl.GLES10;
 import android.opengl.GLES20;
 
+import java.util.concurrent.CountDownLatch;
+
 
 /**
  * Created by triniwiz on 2019-07-06
@@ -142,6 +144,18 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     private static native long nativeSetCurrentTransform(long canvas, long matrix);
 
     private static native long nativeGetCurrentTransform(long canvas);
+
+    private static native boolean nativeIsPointInPath(long canvas, float x, float y);
+
+    private static native boolean nativeIsPointInPathWithRule(long canvas, float x, float y, String fillRule);
+
+    private static native boolean nativeIsPointInPathWithPathRule(long canvas, long path, float x, float y, String fillRule);
+
+    private static native boolean nativeIsPointInStroke(long canvas, float x, float y);
+
+    private static native boolean nativeIsPointInStrokeWithPath(long canvas, long path, float x, float y);
+
+    private static native byte[] nativeGetImageData(long canvas, float sx, float sy, int width, int height);
 
     private CanvasView canvasView;
 
@@ -969,8 +983,6 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
-    private static native byte[] nativeGetImageData(long canvas, float sx, float sy, int width, int height);
-
     public ImageData getImageData(float sx, float sy, int sw, int sh) {
         byte[] data = CanvasRenderingContext2D.nativeGetImageData(canvasView.canvas, sx, sy, sw, sh);
         return new ImageData(sw, sh, data);
@@ -1034,5 +1046,89 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         return new CanvasDOMMatrix(matrix);
     }
 
+    public boolean isPointInPath(final float x, final float y) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final boolean[] value = new boolean[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                value[0] = nativeIsPointInPath(canvasView.canvas, x, y);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignore) {
+        }
+        return value[0];
+    }
+
+    public boolean isPointInPath(final float x, final float y, final String fillRule) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final boolean[] value = new boolean[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                value[0] = nativeIsPointInPathWithRule(canvasView.canvas, x, y, fillRule);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignore) {
+        }
+        return value[0];
+    }
+
+    public boolean isPointInPath(final CanvasPath2D path, final float x, final float y, final String fillRule) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final boolean[] value = new boolean[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                value[0] = nativeIsPointInPathWithPathRule(canvasView.canvas, path.path, x, y, fillRule);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignore) {
+        }
+        return value[0];
+    }
+
+    public boolean isPointInStroke(final float x, final float y) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final boolean[] value = new boolean[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                value[0] = nativeIsPointInStroke(canvasView.canvas, x, y);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignore) {
+        }
+        return value[0];
+    }
+
+    public boolean isPointInStroke(final CanvasPath2D path, final float x, final float y) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final boolean[] value = new boolean[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                value[0] = nativeIsPointInStrokeWithPath(canvasView.canvas, path.path, x, y);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignore) {
+        }
+        return value[0];
+    }
 
 }
