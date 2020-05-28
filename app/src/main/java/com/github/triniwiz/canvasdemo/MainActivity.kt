@@ -566,7 +566,9 @@ class MainActivity : AppCompatActivity() {
 
     @SuppressLint("NewApi")
     fun drawFill(view: View) {
-        ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
+       // ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
+       // drawImageExample(ctx!!)
+       // drawFace(ctx!!)
       //  ctx?.fillRect(0F,0F,200f,200f)
       //  ballExample(ctx!!)
         /* ctx?.fillStyle = CanvasColorStyle.Color(Color.BLUE)
@@ -593,10 +595,10 @@ class MainActivity : AppCompatActivity() {
             Log.d("com.test", "dddd: " + it)
         }*/
 
-        drawImageExample(ctx!!)
+       // drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
-      //  gl = canvas?.getContext("webgl") as WebGLRenderingContext
-        //drawElements(canvas!!)
+        gl = canvas?.getContext("webgl") as WebGLRenderingContext
+        drawElements(canvas!!)
      //  Log.d("com.test", "ext: " +   gl!!.getExtension("ANGLE_instanced_arrays"))
 
       // drawRotatingCube(gl!!)

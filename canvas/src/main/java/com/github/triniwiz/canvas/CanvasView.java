@@ -123,6 +123,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             isLibraryLoaded = true;
         }
         glSurfaceView = new GLTextureView(context, attrs);
+        glSurfaceView.setDebugFlags(2);
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
         mainHandler = new Handler(Looper.getMainLooper());
@@ -136,13 +137,13 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             glSurfaceView.setEGLContextClientVersion(2);
             glVersion = 2;
         }
+        glSurfaceView.setPreserveEGLContextOnPause(true);
         glSurfaceView.setRenderer(this);
         glSurfaceView.setOpaque(false);
         glSurfaceView.setRenderMode(GLTextureView.RENDERMODE_WHEN_DIRTY);
         glSurfaceView.setLayoutParams(
                 new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         );
-        glSurfaceView.setPreserveEGLContextOnPause(true);
         addView(glSurfaceView);
     }
 
@@ -161,9 +162,11 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     public void onPause() {
         Choreographer.getInstance().removeFrameCallback(this);
+        glSurfaceView.onPause();
     }
 
     public void onResume() {
+        glSurfaceView.onResume();
         Choreographer.getInstance().postFrameCallback(this);
     }
 
@@ -175,7 +178,6 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     @Override
     protected void finalize() throws Throwable {
         super.finalize();
-        Log.d("com.test", "finalize ?????");
         if (canvas != 0) {
             destroy();
         }
@@ -216,17 +218,16 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     @Override
     public void onActivityResumed(@NonNull Activity activity) {
-        onResume();
+        //onResume();
     }
 
     @Override
     public void onActivityPaused(@NonNull Activity activity) {
-
     }
 
     @Override
     public void onActivityStopped(@NonNull Activity activity) {
-        onPause();
+        //onPause();
     }
 
     @Override
@@ -305,7 +306,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         WEBGL
     }
 
-    private void initCanvas(){
+    private void initCanvas() {
         queueEvent(new Runnable() {
             @Override
             public void run() {
@@ -383,7 +384,6 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     @Override
     public void surfaceDestroyed(SurfaceHolder holder) {
     }
-
 
     @Override
     public void onSurfaceCreated(GL10 gl, javax.microedition.khronos.egl.EGLConfig config) {
@@ -485,6 +485,8 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             if (pendingInvalidate) {
                 if (canvas > 0) {
                     // clear();
+                    // GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                    // GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
                     canvas = nativeFlush(canvas);
                 }
                 pendingInvalidate = false;

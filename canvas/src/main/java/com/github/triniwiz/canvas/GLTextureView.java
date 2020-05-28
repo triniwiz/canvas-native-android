@@ -832,7 +832,10 @@ public class GLTextureView extends TextureView
             super(new int[] {
                     EGL10.EGL_RED_SIZE, redSize, EGL10.EGL_GREEN_SIZE, greenSize, EGL10.EGL_BLUE_SIZE,
                     blueSize, EGL10.EGL_ALPHA_SIZE, alphaSize, EGL10.EGL_DEPTH_SIZE, depthSize,
-                    EGL10.EGL_STENCIL_SIZE, stencilSize, EGL10.EGL_NONE
+                    EGL10.EGL_STENCIL_SIZE, stencilSize,
+                    // EGL10.EGL_SAMPLE_BUFFERS, 1,
+                   // EGL10.EGL_SAMPLES, 4,
+                    EGL10.EGL_NONE
             });
             value = new int[1];
             this.redSize = redSize;
@@ -1013,9 +1016,9 @@ public class GLTextureView extends TextureView
             }
 
 
-
             EGL14.eglSurfaceAttrib(EGL14.eglGetCurrentDisplay(), EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW),
                     EGL14.EGL_SWAP_BEHAVIOR, EGL14.EGL_BUFFER_PRESERVED);
+            ;
 
 
 

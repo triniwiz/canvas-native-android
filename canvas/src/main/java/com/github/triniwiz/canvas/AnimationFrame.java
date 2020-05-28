@@ -54,14 +54,11 @@ public class AnimationFrame implements Choreographer.FrameCallback {
         executorService.submit(new Runnable() {
             @Override
             public void run() {
-                Log.d("com.test", "raf: " + fps);
                 HashMap<Long, Callback> cbs = (HashMap<Long, Callback>) callbacks.clone();
                 callbacks.clear();
                 inAnimationFrame = true;
                 Set<Map.Entry<Long, Callback>> set = cbs.entrySet();
-                Log.d("com.test", "jjjj " + cbs.size());
                 for (final Map.Entry<Long, Callback> cb : set) {
-                    Log.d("com.test", "id: " + animationId + " key " + cb.getKey());
                     //if(cb.getKey() == animationId){
                     handler.post(new Runnable() {
                         @Override
@@ -102,7 +99,6 @@ public class AnimationFrame implements Choreographer.FrameCallback {
 
     @Override
     public void doFrame(long frameTimeNanos) {
-        Log.d("com.test", "doFrame: " + frameTimeNanos);
         fps(frameTimeNanos / 1000000);
         Choreographer.getInstance().postFrameCallback(instance);
     }

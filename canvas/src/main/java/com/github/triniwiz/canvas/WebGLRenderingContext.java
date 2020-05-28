@@ -2590,7 +2590,7 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             public void run() {
                 byte[] raw = asset.getBytes();
                 if (flipYWebGL) {
-                  //  flipInPlace(raw, asset.getWidth(), asset.getHeight());
+                    //  flipInPlace(raw, asset.getWidth(), asset.getHeight());
                 }
                 GLES20.glTexImage2D(target, level, internalformat, asset.getWidth(), asset.getHeight(), 0, format, type, ByteBuffer.wrap(raw));
                 lock.countDown();
