@@ -2,6 +2,8 @@ package com.github.triniwiz.canvas;
 
 import android.graphics.Bitmap;
 
+import androidx.annotation.Nullable;
+
 import java.io.ByteArrayOutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -20,12 +22,13 @@ public class ImageAsset {
 
     private static native int nativeFlipY(long asset);
 
-
     private static native byte[] nativeGetBytes(long asset);
 
     private static native long nativeScale(long asset, int x, int y);
 
     private static native String nativeGetError(long asset);
+
+    private static native  boolean nativeHasError(long asset);
 
     private static native boolean nativeSave(long asset, String path, int format);
 
@@ -67,8 +70,11 @@ public class ImageAsset {
         return nativeGetBytes(nativeImageAsset);
     }
 
-    public String getError() {
+    public @Nullable String getError() {
         if (nativeImageAsset == 0) {
+            return null;
+        }
+        if(!nativeHasError(nativeImageAsset)){
             return null;
         }
         return nativeGetError(nativeImageAsset);
@@ -85,14 +91,14 @@ public class ImageAsset {
         if (nativeImageAsset == 0) {
             return;
         }
-        nativeFlipX(nativeImageAsset);
+        nativeImageAsset = nativeFlipX(nativeImageAsset);
     }
 
     public void flipY() {
         if (nativeImageAsset == 0) {
             return;
         }
-        nativeFlipY(nativeImageAsset);
+        nativeImageAsset = nativeFlipY(nativeImageAsset);
     }
 
     public boolean save(String path, ImageAssetFormat format) {

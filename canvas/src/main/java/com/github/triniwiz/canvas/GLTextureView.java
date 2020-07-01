@@ -41,13 +41,13 @@ public class GLTextureView extends TextureView
 
     private final static String TAG = GLTextureView.class.getSimpleName();
 
-    private final static boolean LOG_ATTACH_DETACH = false;
-    private final static boolean LOG_THREADS = false;
-    private final static boolean LOG_PAUSE_RESUME = false;
-    private final static boolean LOG_SURFACE = false;
-    private final static boolean LOG_RENDERER = false;
-    private final static boolean LOG_RENDERER_DRAW_FRAME = false;
-    private final static boolean LOG_EGL = false;
+    private final static boolean LOG_ATTACH_DETACH = true;
+    private final static boolean LOG_THREADS = true;
+    private final static boolean LOG_PAUSE_RESUME = true;
+    private final static boolean LOG_SURFACE = true;
+    private final static boolean LOG_RENDERER = true;
+    private final static boolean LOG_RENDERER_DRAW_FRAME = true;
+    private final static boolean LOG_EGL = true;
 
     static interface Listener {
         void didDraw();
@@ -896,9 +896,21 @@ public class GLTextureView extends TextureView
      * An EGL helper class.
      */
 
-    private static class EglHelper {
+    static class EglHelper {
         public EglHelper(WeakReference<GLTextureView> glTextureViewWeakReference) {
             this.glTextureViewWeakRef = glTextureViewWeakReference;
+        }
+
+        public boolean makeContextCurrent(){
+            if (!egl.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+                /*
+                 * Could not make the context current, probably because the underlying
+                 * TextureView surface has been destroyed.
+                 */
+                logEglErrorAsWarning("EGLHelper", "eglMakeCurrent", egl.eglGetError());
+                return false;
+            }
+            return true;
         }
 
         /**
@@ -1016,11 +1028,10 @@ public class GLTextureView extends TextureView
             }
 
 
-            EGL14.eglSurfaceAttrib(EGL14.eglGetCurrentDisplay(), EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW),
-                    EGL14.EGL_SWAP_BEHAVIOR, EGL14.EGL_BUFFER_PRESERVED);
-            ;
-
-
+            if(!CanvasView.isEmulator()){
+                EGL14.eglSurfaceAttrib(EGL14.eglGetCurrentDisplay(), EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW),
+                        EGL14.EGL_SWAP_BEHAVIOR, EGL14.EGL_BUFFER_PRESERVED);
+            }
 
             return true;
         }
@@ -1659,7 +1670,7 @@ public class GLTextureView extends TextureView
 
         // End of member variables protected by the glThreadManager monitor.
 
-        private EglHelper eglHelper;
+        EglHelper eglHelper;
 
         /**
          * Set once at thread construction time, nulled out when the parent view is garbage
@@ -1811,7 +1822,7 @@ public class GLTextureView extends TextureView
     private static final GLThreadManager glThreadManager = new GLThreadManager();
 
     private final WeakReference<GLTextureView> mThisWeakRef = new WeakReference<>(this);
-    private GLThread glThread;
+    GLThread glThread;
     private Renderer renderer;
     private boolean detached;
     private EGLConfigChooser eglConfigChooser;

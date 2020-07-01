@@ -7,6 +7,7 @@ import android.app.ActivityManager;
 import android.app.Application;
 import android.content.Context;
 import android.content.pm.ConfigurationInfo;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.ColorDrawable;
@@ -25,14 +26,22 @@ import android.util.Size;
 import android.view.Choreographer;
 import android.view.OrientationEventListener;
 import android.view.SurfaceHolder;
+import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.text.TextUtilsCompat;
+import androidx.core.view.ViewCompat;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.lang.ref.WeakReference;
+import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -50,7 +59,7 @@ import javax.microedition.khronos.opengles.GL10;
  */
 public class CanvasView extends FrameLayout implements GLTextureView.Renderer, Choreographer.FrameCallback, SurfaceHolder.Callback, Application.ActivityLifecycleCallbacks {
 
-    private static native long nativeInit(long canvas_ptr, int id, int width, int height, float scale);
+    static native long nativeInit(boolean useCpu, int id, int width, int height, float scale, String direction);
 
     private static native long nativeResize(long canvas_ptr, int id, int width, int height, float scale);
 
@@ -60,16 +69,21 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     private static native long nativeDestroy(long canvas_ptr);
 
-    private static native long nativeFlush(long canvas_ptr);
+    static native long nativeFlush(long canvas_ptr);
+
+    static native long nativeCpuFlush(long canvas_ptr, Bitmap view);
 
     private static native String nativeToDataUrl(long canvas_ptr, String type, float quality);
 
     private static native byte[] nativeToData(long canvas_ptr);
 
+    private static native byte[] nativeSnapshotCanvas(long canvas_ptr);
+
     private HandlerThread handlerThread = new HandlerThread("CanvasViewThread");
     private Handler handler;
 
-    GLTextureView glSurfaceView;
+    GLView glView;
+    CPUView cpuView;
     private boolean handleInvalidationManually = false;
     long canvas = 0;
     CanvasRenderingContext renderingContext2d = null;
@@ -83,6 +97,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     boolean wasPendingDraw = false;
     static long lastCall = 0;
     ContextType contextType = ContextType.NONE;
+    boolean useCpu = false;
 
     void clear() {
         queueEvent(new Runnable() {
@@ -92,6 +107,8 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
             }
         });
     }
+
+    Bitmap view;
 
     @Override
     public void doFrame(long frameTimeNanos) {
@@ -105,6 +122,12 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     public CanvasView(Context context) {
         super(context, null);
+        init(context, false);
+    }
+
+    public CanvasView(Context context, boolean useCpu) {
+        super(context, null);
+        init(context, useCpu);
     }
 
     private static boolean isLibraryLoaded = false;
@@ -114,39 +137,66 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
     public CanvasView(final Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
+        init(context, true);
+    }
+
+    private void init(Context context, boolean useCpu) {
         if (isInEditMode()) {
             return;
         }
+        this.useCpu = useCpu;
         if (!isLibraryLoaded) {
             System.loadLibrary("canvasnative");
-            System.loadLibrary("canvasextras");
             isLibraryLoaded = true;
         }
-        glSurfaceView = new GLTextureView(context, attrs);
-        glSurfaceView.setDebugFlags(2);
+        glView = new GLView(context);
+        glView.getGLContext().reference = new WeakReference<>(this);
+        glView.setListener(new Listener() {
+            @Override
+            public void contextReady() {
+                mainHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (listener != null) {
+                            listener.contextReady();
+                        }
+                    }
+                });
+            }
+        });
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
         mainHandler = new Handler(Looper.getMainLooper());
         ctx = context;
         scale = context.getResources().getDisplayMetrics().density;
-        glSurfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 8);
         if (detectOpenGLES30() && !isEmulator()) {
-            glSurfaceView.setEGLContextClientVersion(3);
             glVersion = 3;
         } else {
-            glSurfaceView.setEGLContextClientVersion(2);
             glVersion = 2;
         }
-        glSurfaceView.setPreserveEGLContextOnPause(true);
-        glSurfaceView.setRenderer(this);
-        glSurfaceView.setOpaque(false);
-        glSurfaceView.setRenderMode(GLTextureView.RENDERMODE_WHEN_DIRTY);
-        glSurfaceView.setLayoutParams(
+
+        glView.setLayoutParams(
                 new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         );
-        addView(glSurfaceView);
+        if (useCpu) {
+            cpuView = new CPUView(context);
+            cpuView.canvasView = new WeakReference<>(this);
+            cpuView.setLayoutParams(
+                    new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            );
+            initCPUThread();
+            addView(cpuView);
+        } else {
+            addView(glView);
+        }
+
     }
 
+    private void initCPUThread() {
+        cpuHandlerThread = new HandlerThread("CanvasViewCpuThread");
+        cpuHandlerThread.start();
+        cpuHandler = new Handler(cpuHandlerThread.getLooper());
+    }
 
     static final String TAG = "CanvasView";
 
@@ -161,13 +211,15 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     }
 
     public void onPause() {
-        Choreographer.getInstance().removeFrameCallback(this);
-        glSurfaceView.onPause();
+        if (glView != null) {
+            glView.getGLContext().onPause();
+        }
     }
 
     public void onResume() {
-        glSurfaceView.onResume();
-        Choreographer.getInstance().postFrameCallback(this);
+        if (glView != null) {
+            glView.getGLContext().onResume();
+        }
     }
 
     public void destroy() {
@@ -191,13 +243,77 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         return handleInvalidationManually;
     }
 
-    public GLTextureView getSurface() {
-        return glSurfaceView;
+    public GLView getSurface() {
+        return glView;
     }
 
-    public void queueEvent(Runnable runnable) {
-        if (glSurfaceView != null) {
-            glSurfaceView.queueEvent(runnable);
+    Handler cpuHandler;
+    HandlerThread cpuHandlerThread;
+
+    public void queueEvent(final Runnable runnable) {
+        if (useCpu) {
+            if (!cpuHandlerThread.isAlive() || cpuHandlerThread.isInterrupted()) {
+                cpuHandlerThread = null;
+                cpuHandler = null;
+                initCPUThread();
+            }
+            cpuHandler.post(runnable);
+        } else {
+            if (!glView.getGLContext().isGLThreadStarted()) {
+                glView.getGLContext().init(null);
+            }
+            if (contextType == ContextType.CANVAS && canvas == 0) {
+                initCanvas();
+            }
+            glView.queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (lock) {
+                        if (canvas == 0 && contextType == ContextType.CANVAS) {
+                            int width = glView.getWidth();
+                            int height = glView.getHeight();
+                            // dynamically created view w/o layout
+                            ViewGroup.LayoutParams params = glView.getLayoutParams();
+                            if (width == 0 && params != null) {
+                                width = params.width;
+                                needRenderRequest += 1;
+                            }
+
+                            if (height == 0 && params != null) {
+                                height = params.height;
+                                needRenderRequest += 1;
+                            }
+                            // size was not set set to 1
+                            if (width == 0) {
+                                width = 1;
+                                needRenderRequest += 1;
+                            }
+                            if (height == 0) {
+                                height = 1;
+                                needRenderRequest += 1;
+                            }
+
+                            if (newSize == null || newSize.width == 0 && newSize.height == 0) {
+                                newSize = new Size(width, height);
+                            }
+
+
+                            final int finalWidth = width;
+                            final int finalHeight = height;
+
+                            if (canvas == 0 && finalWidth > 0 && finalHeight > 0) {
+                                // GLES20.glClearColor(1F, 1F, 1F, 1F);
+                                // GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                                int[] frameBuffers = new int[1];
+                                GLES20.glViewport(0, 0, finalWidth, finalHeight);
+                                GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
+                                canvas = nativeInit(false, frameBuffers[0], finalWidth, finalHeight, scale, getDirection());
+                            }
+                        }
+                        runnable.run();
+                    }
+                }
+            });
         }
     }
 
@@ -246,7 +362,58 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
 
 
     public byte[] toData() {
-        return nativeToData(canvas);
+        if (contextType == ContextType.CANVAS) {
+            final CountDownLatch lock = new CountDownLatch(1);
+            final byte[][] data = new byte[1][];
+            queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    data[0] = nativeToData(canvas);
+                    lock.countDown();
+                }
+            });
+            try {
+                lock.await();
+            } catch (InterruptedException ignore) {
+            }
+            return data[0];
+        } else if (contextType == ContextType.WEBGL) {
+            Bitmap bm = glView.getBitmap(getWidth(), getHeight());
+            byte[] data = new byte[bm.getWidth() * bm.getHeight() * 4];
+            ByteBuffer buffer = ByteBuffer.wrap(data);
+            bm.copyPixelsToBuffer(buffer);
+            return data;
+        }
+
+        return new byte[0];
+    }
+
+    byte[] snapshot() {
+        if (contextType == ContextType.CANVAS) {
+            final CountDownLatch lock = new CountDownLatch(1);
+            final byte[][] ss = new byte[1][];
+            initCanvas();
+            queueEvent(new Runnable() {
+                @Override
+                public void run() {
+                    ss[0] = nativeSnapshotCanvas(canvas);
+                    lock.countDown();
+                }
+            });
+            try {
+                lock.await();
+            } catch (InterruptedException ignore) {
+
+            }
+            return ss[0];
+        } else if (contextType == ContextType.WEBGL) {
+            Bitmap bm = glView.getBitmap(getWidth(), getHeight());
+            ByteArrayOutputStream os = new ByteArrayOutputStream();
+            bm.compress(Bitmap.CompressFormat.PNG, 100, os);
+            return os.toByteArray();
+        }
+
+        return new byte[0];
     }
 
     public String toDataURL() {
@@ -306,49 +473,135 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         WEBGL
     }
 
-    private void initCanvas() {
+    int needRenderRequest = 0;
+
+    public void resizeViewPort() {
         queueEvent(new Runnable() {
             @Override
             public void run() {
-                if (canvas == 0 && glSurfaceView.getWidth() > 0 && glSurfaceView.getHeight() > 0) {
-                    GLES20.glClearColor(1F, 1F, 1F, 1F);
-                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
-                    int[] frameBuffers = new int[1];
-                    GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
-                    canvas = nativeInit(canvas, frameBuffers[0], glSurfaceView.getWidth(), glSurfaceView.getHeight(), scale);
-                }
+                GLES20.glViewport(0, 0, getWidth(), getHeight());
             }
         });
     }
 
+    static String getDirection() {
+        String direction = "ltr";
+        if (TextUtilsCompat.getLayoutDirectionFromLocale(Locale.getDefault()) == ViewCompat.LAYOUT_DIRECTION_RTL) {
+            direction = "rtl";
+        }
+        return direction;
+    }
+
+    void initCanvas() {
+        synchronized (lock) {
+            if (glView != null && canvas == 0) {
+                int width = glView.getWidth();
+                int height = glView.getHeight();
+                // dynamically created view w/o layout
+                ViewGroup.LayoutParams params = glView.getLayoutParams();
+                if (width == 0 && params != null) {
+                    width = params.width;
+                    needRenderRequest += 1;
+                }
+
+                if (height == 0 && params != null) {
+                    height = params.height;
+                    needRenderRequest += 1;
+                }
+                // size was not set set to 1
+                if (width == 0) {
+                    width = 1;
+                    needRenderRequest += 1;
+                }
+                if (height == 0) {
+                    height = 1;
+                    needRenderRequest += 1;
+                }
+
+                if (newSize == null || newSize.width == 0 && newSize.height == 0) {
+                    newSize = new Size(width, height);
+                }
+
+
+                final int finalWidth = width;
+                final int finalHeight = height;
+
+                glView.queueEvent(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (canvas == 0 && finalWidth > 0 && finalHeight > 0) {
+                            // GLES20.glClearColor(1F, 1F, 1F, 1F);
+                            // GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+                            int[] frameBuffers = new int[1];
+                            GLES20.glViewport(0, 0, finalWidth, finalHeight);
+                            GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
+                            canvas = nativeInit(false, frameBuffers[0], finalWidth, finalHeight, scale, getDirection());
+                        }
+                    }
+                });
+            }
+        }
+    }
+
     public @Nullable
     CanvasRenderingContext getContext(String type) {
+        HashMap<String, Object> attributes = new HashMap<>();
+        if (type.equals("2d")) {
+            attributes.put("alpha", true);
+        } else if (type.contains("webgl")) {
+            attributes.put("alpha", true);
+            attributes.put("depth", true);
+            attributes.put("failIfMajorPerformanceCaveat", false);
+            attributes.put("powerPreference", "default");
+            attributes.put("premultipliedAlpha", true);
+            attributes.put("preserveDrawingBuffer", false);
+            attributes.put("stencil", false);
+            attributes.put("xrCompatible", false);
+        }
+        return getContext(type, attributes);
+    }
+
+
+    public @Nullable
+    CanvasRenderingContext getContext(String type, Map<String, Object> contextAttributes) {
         switch (type) {
             case "2d":
                 if (renderingContext2d == null) {
                     renderingContext2d = new CanvasRenderingContext2D(this);
                 }
                 contextType = ContextType.CANVAS;
-                initCanvas();
+                if (contextAttributes.containsKey("alpha")) {
+                    boolean alpha = (boolean) contextAttributes.get("alpha");
+                    glView.setOpaque(alpha);
+                }
                 return renderingContext2d;
             case "webgl":
                 if (webGLRenderingContext == null) {
                     webGLRenderingContext = new WebGLRenderingContext(this);
                 }
                 contextType = ContextType.WEBGL;
+                if (contextAttributes.containsKey("alpha")) {
+                    boolean alpha = (boolean) contextAttributes.get("alpha");
+                    glView.setOpaque(alpha);
+                }
                 return webGLRenderingContext;
             case "webgl2":
                 if (webGL2RenderingContext == null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR2) {
                         webGL2RenderingContext = new WebGL2RenderingContext(this);
                         isWebGL = true;
+                        contextType = ContextType.WEBGL;
+                        if (contextAttributes.containsKey("alpha")) {
+                            boolean alpha = (boolean) contextAttributes.get("alpha");
+                            glView.setOpaque(alpha);
+                        }
                     } else {
                         isWebGL = false;
                         contextType = ContextType.NONE;
                         return null;
                     }
                 }
-                contextType = ContextType.WEBGL;
+
                 return webGL2RenderingContext;
         }
         contextType = ContextType.NONE;
@@ -371,6 +624,8 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         super.onAttachedToWindow();
         Choreographer.getInstance().postFrameCallback(this);
     }
+
+    SurfaceHolder holder;
 
     @Override
     public void surfaceCreated(SurfaceHolder holder) {
@@ -432,6 +687,7 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
         }
     }
 
+
     Size lastSize;
     Size newSize;
 
@@ -441,7 +697,11 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
     }
 
     public void flush() {
-        glSurfaceView.requestRender();
+        if (useCpu) {
+            cpuView.flush();
+        } else {
+            glView.flush();
+        }
     }
 
     void showForeground() {
@@ -473,20 +733,28 @@ public class CanvasView extends FrameLayout implements GLTextureView.Renderer, C
                 lastSize = newSize;
                 int[] frameBuffers = new int[1];
                 GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
-                canvas = CanvasView.nativeInit(canvas, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale);
+                canvas = CanvasView.nativeInit(false, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale, getDirection());
             }
-            if (lastSize != newSize) {
-                lastSize = newSize;
-                int[] frameBuffers = new int[1];
-                GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
-                canvas = nativeResize(canvas, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale);
+            if (canvas > 0) {
+                if (lastSize != newSize) {
+                    lastSize = newSize;
+                    int[] frameBuffers = new int[1];
+                    GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, frameBuffers, 0);
+                    GLES20.glViewport(0, 0, newSize.getWidth(), newSize.getHeight());
+                    // canvas = nativeResize(canvas, frameBuffers[0], lastSize.getWidth(), lastSize.getHeight(), scale);
+                }
             }
 
             if (pendingInvalidate) {
                 if (canvas > 0) {
                     // clear();
-                    // GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+                    //  GLES20.glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
                     // GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
+
+                    GLES20.glClearColor(0, 0, 0, 0);
+                    GLES20.glClearDepthf(1);
+                    GLES20.glClearStencil(0);
+                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT | GLES20.GL_DEPTH_BUFFER_BIT | GLES20.GL_STENCIL_BUFFER_BIT);
                     canvas = nativeFlush(canvas);
                 }
                 pendingInvalidate = false;

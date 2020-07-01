@@ -81,13 +81,11 @@ public class WebGL2RenderingContext extends WebGLRenderingContext {
         }
     }
 
-
     public void bindBufferRange(final int target, final int index, final int buffer, final int offset, final int size) {
         final CountDownLatch lock = new CountDownLatch(1);
         runOnGLThread(new Runnable() {
             @Override
             public void run() {
-
                 GLES30.glBindBufferRange(target, index, buffer, offset, size);
             }
         });
