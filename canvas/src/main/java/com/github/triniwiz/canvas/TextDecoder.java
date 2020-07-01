@@ -12,6 +12,10 @@ public class TextDecoder {
 
     private static native String nativeDecode(long encoder, byte[] bytes);
 
+    private static native String nativeDecodeShort(long encoder, short[] bytes);
+
+    private static native String nativeDecodeInt(long encoder, int[] bytes);
+
     public TextDecoder() {
         init("utf-8");
     }
@@ -26,6 +30,14 @@ public class TextDecoder {
 
     public String decode(byte[] bytes) {
         return nativeDecode(nativeDecoder, bytes);
+    }
+
+    public String decode(short[] bytes) {
+        return nativeDecodeShort(nativeDecoder, bytes);
+    }
+
+    public String decode(int[] bytes) {
+        return nativeDecodeInt(nativeDecoder, bytes);
     }
 
     public String getEncoding() {

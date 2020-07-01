@@ -9,19 +9,19 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.StrictMode
+import android.util.Base64
 import android.util.Log
-import android.view.Choreographer
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import com.github.triniwiz.canvas.*
+import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.URL
 import java.util.*
-import javax.microedition.khronos.egl.EGL
-import javax.microedition.khronos.egl.EGL10
-import javax.microedition.khronos.egl.EGLContext
 import kotlin.math.*
 
 
@@ -33,6 +33,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         canvas = findViewById(R.id.canvasView)
+        canvas?.setListener {
+            print("Is Ready")
+        }
         init()
     }
 
@@ -316,8 +319,10 @@ class MainActivity : AppCompatActivity() {
             ctx.globalCompositeOperation = CanvasCompositeOperationType.DestinationOver
             ctx.clearRect(0F, 0F, 300F, 300F) // clear canvas
 
-            ctx.fillStyle = CanvasColorStyle.Color("rgba(0, 0, 0, 0.4)")
-            ctx.strokeStyle = CanvasColorStyle.Color("rgba(0, 153, 255, 0.4)")
+            ctx.fillStyle =
+                Color("rgba(0, 0, 0, 0.4)")
+            ctx.strokeStyle =
+                Color("rgba(0, 153, 255, 0.4)")
             ctx.save()
             ctx.translate(150F, 150F)
 
@@ -386,12 +391,26 @@ class MainActivity : AppCompatActivity() {
         ctx.shadowOffsetY = 20F
 
 // Filled rectangle
-        ctx.fillStyle = CanvasColorStyle.Color(Color.argb(0.2F, 0F, (255 / 255).toFloat(), 0F))
+        ctx.fillStyle = Color(
+            Color.argb(
+                0.2F,
+                0F,
+                (255 / 255).toFloat(),
+                0F
+            )
+        )
         ctx.fillRect(10F, 10F, 150F, 100F)
 
 // Stroked rectangle
         ctx.lineWidth = 10F
-        ctx.strokeStyle = CanvasColorStyle.Color(Color.argb(0.6F, 0F, 0F, (255 / 255).toFloat()))
+        ctx.strokeStyle = Color(
+            Color.argb(
+                0.6F,
+                0F,
+                0F,
+                (255 / 255).toFloat()
+            )
+        )
         ctx.strokeRect(10F, 10F, 150F, 100F);
     }
 
@@ -462,9 +481,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun faceLoop(ctx: CanvasRenderingContext2D) {
-        ctx.fillStyle = CanvasColorStyle.Color("white")
+        ctx.fillStyle = Color("white")
         ctx.fillRect(0f, 0f, ctx.canvas.width.toFloat(), ctx.canvas.height.toFloat())
-        ctx.fillStyle = CanvasColorStyle.Color("black")
+        ctx.fillStyle = Color("black")
         drawFace(ctx)
         AnimationFrame.requestAnimationFrame {
             faceLoop(ctx)
@@ -563,14 +582,59 @@ class MainActivity : AppCompatActivity() {
 
 
 
+    fun drawPattern(canvas: CanvasView) {
+        val img = File(filesDir, "Canvas_createpattern.png")
+
+        val asset = ImageAsset()
+
+            if (img.exists()) {
+                asset.loadImageFromPath(img.absolutePath)
+            } else {
+                val url = URL("https://mdn.mozillademos.org/files/222/Canvas_createpattern.png")
+                val fs = FileOutputStream(img)
+                url.openStream().use { input ->
+                    fs.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                asset.loadImageFromPath(img.absolutePath)
+            }
+
+        val ctx = canvas.getContext("2d") as CanvasRenderingContext2D
+        val pattern = ctx.createPattern(asset, Pattern.PatternRepetition.Repeat)
+        ctx.fillStyle = pattern
+
+        ctx.fillRect(0f, 0f, 300f, 300f);
+
+
+    }
+
+    var didPause = false;
+    override fun onPause() {
+        super.onPause()
+        canvas?.onPause()
+        didPause = true;
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if(didPause){
+            canvas?.onResume()
+            ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
+            ballExample(ctx!!)
+        }
+    }
+
 
     @SuppressLint("NewApi")
     fun drawFill(view: View) {
-       // ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
-       // drawImageExample(ctx!!)
+       // drawPattern(canvas!!)
+        ctx = canvas?.getContext("2d") as CanvasRenderingContext2D?
+        //drawImageExample(ctx!!)
        // drawFace(ctx!!)
-      //  ctx?.fillRect(0F,0F,200f,200f)
-      //  ballExample(ctx!!)
+        //ctx?.fillStyle = Color.BLACK
+      // ctx?.fillRect(0F,0F,200f,200f)
+           ballExample(ctx!!)
         /* ctx?.fillStyle = CanvasColorStyle.Color(Color.BLUE)
          ctx?.clearRect(0F,0F, canvas!!.width.toFloat(), canvas!!.height.toFloat())
          ctx?.fillRect(0F,0F,200f,200f)
@@ -579,9 +643,24 @@ class MainActivity : AppCompatActivity() {
              ctx?.fillStyle = CanvasColorStyle.Color(Color.BLACK)
              drawImageExample(ctx!!)
          },null,4000)*/
-       // drawHouse(ctx!!)
-        //drawSVG(svgView!!)
         //drawHouse(ctx!!)
+        //drawSVG(svgView!!)
+       /* val cs = CanvasView(this)
+        Log.d("com.test", "params " +  cs.layoutParams)
+        cs.layoutParams = ViewGroup.LayoutParams(300,300)
+        cs.surface.layoutParams =  ViewGroup.LayoutParams(300,300)
+        Log.d("com.test", "www: " +  cs.surface.width + "  " + cs.width)
+       // cs.onResume()
+        val os = cs.getContext("2d") as CanvasRenderingContext2D
+        os.strokeStyle = Color(Color.RED)
+        val data = os.createImageData(300,300)
+        Log.d("com.test",  " f " +  data.data[0] + " s" + data.data[1])
+        os.strokeRect(0f,0f,300f,300f)
+        ctx?.drawImage(cs,0f,0f)
+
+        */
+
+       // drawHouse(ctx!!)
         /*canvasView.toDataURLAsync {
             Log.d("com.test", "aaaa: " + it)
         }
@@ -595,10 +674,11 @@ class MainActivity : AppCompatActivity() {
             Log.d("com.test", "dddd: " + it)
         }*/
 
+      //  drawPatterWithCanvas(canvas!!)
        // drawImageExample(ctx!!)
         // drawImageSmoothingEnabled(ctx!!)
-        gl = canvas?.getContext("webgl") as WebGLRenderingContext
-        drawElements(canvas!!)
+        //gl = canvas?.getContext("webgl") as WebGLRenderingContext
+       // drawElements(canvas!!)
      //  Log.d("com.test", "ext: " +   gl!!.getExtension("ANGLE_instanced_arrays"))
 
       // drawRotatingCube(gl!!)
@@ -608,8 +688,7 @@ class MainActivity : AppCompatActivity() {
         // Create clipping path
         // Create clipping path
 
-
-//solarAnimation(ctx!!)
+       // solarAnimation(ctx!!)
       // draw(ctx!!)
 
        // canvas?.flush()
@@ -626,6 +705,56 @@ class MainActivity : AppCompatActivity() {
         fos.close()
         */
 
+    }
+
+
+    fun drawImageWithCanvasIngl(canvas: CanvasView){
+        val patternCanvas = CanvasView(this)
+        val patternContext = patternCanvas.getContext("2d") as CanvasRenderingContext2D
+// Give the pattern a width and height of 50
+        val scale = resources.displayMetrics.density
+        val width = (300 * scale).toInt()
+        val height = (300 * scale).toInt()
+        patternCanvas.layoutParams = FrameLayout.LayoutParams(width,height)
+        patternCanvas.surface.layoutParams =  FrameLayout.LayoutParams(width,height)
+        val w = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+        val h = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+        patternCanvas.measure(w,h)
+        patternCanvas.layout(0,0,width,height)
+
+        drawImageSmoothingEnabled(patternContext)
+
+// Create our primary canvas and fill it with the pattern
+
+        val ctx = canvas.getContext("webgl") as WebGLRenderingContext
+    }
+
+    fun drawPatterWithCanvas(canvas: CanvasView){
+        val patternCanvas = CanvasView(this)
+        val patternContext = patternCanvas.getContext("2d") as CanvasRenderingContext2D
+// Give the pattern a width and height of 50
+        val scale = resources.displayMetrics.density
+        val width = (50 * scale).toInt()
+        val height = (50 * scale).toInt()
+        patternCanvas.layoutParams = FrameLayout.LayoutParams(width,height)
+        patternCanvas.surface.layoutParams =  FrameLayout.LayoutParams(width,height)
+        val w = View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY)
+        val h = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+        patternCanvas.measure(w,h)
+        patternCanvas.layout(0,0,width,height)
+
+// Give the pattern a background color and draw an arc
+        patternContext.fillStyle = "#fec"
+        patternContext.fillRect(0f, 0f, patternCanvas.width.toFloat(),
+            patternCanvas.height.toFloat()
+        );
+        patternContext.arc(0f, 0f, 50 * scale, 0f, (0.5 * Math.PI).toFloat());
+        patternContext.stroke();
+// Create our primary canvas and fill it with the pattern
+        val ctx = canvas.getContext("2d") as CanvasRenderingContext2D
+        val pattern = ctx.createPattern(patternCanvas, Pattern.PatternRepetition.Repeat)
+        ctx.fillStyle = pattern
+        ctx.fillRect(0f, 0f, canvas.width * scale, canvas.height * scale);
     }
 
 
@@ -1244,7 +1373,7 @@ class MainActivity : AppCompatActivity() {
             ctx.beginPath();
             ctx.arc(x, y, radius, 0f, (Math.PI * 2).toFloat(), true);
             ctx.closePath();
-            ctx.fillStyle = CanvasColorStyle.Color(color)
+            ctx.fillStyle = Color(color)
             ctx.fill();
         }
     }
@@ -1253,11 +1382,11 @@ class MainActivity : AppCompatActivity() {
     fun draw(ctx: CanvasRenderingContext2D) {
         var s = resources.displayMetrics.density
         var canvas = ctx.canvas
-        //ctx.fillStyle = CanvasColorStyle.Color("rgba(255,255,255,0.3)")
+        ctx.fillStyle = "rgba(255,255,255,0.3)"
         var width = canvas.width
         var height = canvas.height
-       // ctx.fillRect(0f, 0f, width.toFloat(), height.toFloat())
-        ctx.clearRect(0f,0f, canvas.width.toFloat(), canvas.height.toFloat());
+        ctx.fillRect(0f, 0f, width.toFloat(), height.toFloat())
+        //ctx.clearRect(0f,0f, canvas.width.toFloat(), canvas.height.toFloat());
         ball.draw(ctx)
         ball.x += ball.vx;
         ball.y += ball.vy;
@@ -1277,6 +1406,7 @@ class MainActivity : AppCompatActivity() {
 
         AnimationFrame.requestAnimationFrame { called ->
             draw(ctx)
+            Log.d("com.test", "requestAnimationFrame")
            // canvas?.flush()
         }
     }
@@ -1382,13 +1512,14 @@ class MainActivity : AppCompatActivity() {
         try {
             val file = File(filesDir, "rhino.jpg")
             if (file.exists()) {
-                val image = BitmapFactory.decodeFile(file.absolutePath)
+                val image = ImageAsset()
+                image.loadImageFromPath(file.absolutePath)
                 ctx.drawImage(image, 33F, 71F, 104F, 124F, 21F, 20F, 87F, 104F)
             } else {
                 val policy = StrictMode.ThreadPolicy.Builder().permitAll().build()
                 StrictMode.setThreadPolicy(policy)
                 val url =
-                    URL("https://images.unsplash.com/photo-1455098934982-64c622c5e066") // URL("https://mdn.mozillademos.org/files/5397/rhino.jpg")
+                    URL("https://mdn.mozillademos.org/files/5397/rhino.jpg") // URL("https://mdn.mozillademos.org/files/5397/rhino.jpg")
                 val fs = FileOutputStream(file)
                 url.openStream().use { input ->
                     fs.use { output ->
@@ -1417,7 +1548,7 @@ class MainActivity : AppCompatActivity() {
     fun drawArcMDN(ctx: CanvasRenderingContext2D) {
         // Tangential lines
         ctx.beginPath();
-        ctx.strokeStyle = CanvasColorStyle.Color(Color.GRAY);
+        ctx.strokeStyle = Color(Color.GRAY);
         ctx.moveTo(200f, 20f);
         ctx.lineTo(200f, 130f);
         ctx.lineTo(50f, 20f);
@@ -1425,7 +1556,7 @@ class MainActivity : AppCompatActivity() {
 
 // Arc
         ctx.beginPath();
-        ctx.strokeStyle = CanvasColorStyle.Color(Color.BLACK);
+        ctx.strokeStyle = Color(Color.BLACK);
         ctx.lineWidth = 5f;
         ctx.moveTo(200f, 20f);
         ctx.arcTo(200f, 130f, 50f, 20f, 40f);
@@ -1433,13 +1564,13 @@ class MainActivity : AppCompatActivity() {
 
 // Start point
         ctx.beginPath();
-        ctx.fillStyle = CanvasColorStyle.Color(Color.BLUE);
+        ctx.fillStyle = Color(Color.BLUE);
         ctx.arc(200f, 20f, 5f, 0f, ((2 * Math.PI).toFloat()));
         ctx.fill();
 
 // Control points
         ctx.beginPath();
-        ctx.fillStyle = CanvasColorStyle.Color(Color.RED);
+        ctx.fillStyle = Color(Color.RED);
         ctx.arc(200f, 130f, 5f, 0f, (2 * Math.PI).toFloat()); // Control point one
         ctx.arc(50f, 20f, 5f, 0f, (2 * Math.PI).toFloat());   // Control point two
         ctx.fill();
@@ -1463,14 +1594,14 @@ class MainActivity : AppCompatActivity() {
         ctx.stroke();
 
 // Start and end points
-        ctx.fillStyle = CanvasColorStyle.Color(Color.BLUE);
+        ctx.fillStyle = Color(Color.BLUE);
         ctx.beginPath();
         ctx.arc(start.x, start.y, 5f, 0f, (2 * Math.PI).toFloat());  // Start point
         ctx.arc(end.x, end.y, 5f, 0f, (2 * Math.PI).toFloat());      // End point
         ctx.fill();
 
 // Control points
-        ctx.fillStyle = CanvasColorStyle.Color(Color.RED);
+        ctx.fillStyle = Color(Color.RED);
         ctx.beginPath();
         ctx.arc(cp1.x, cp1.y, 5f, 0f, (2 * Math.PI).toFloat());  // Control point one
         ctx.arc(cp2.x, cp2.y, 5f, 0f, (2 * Math.PI).toFloat());  // Control point two

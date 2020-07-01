@@ -2583,6 +2583,25 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
     }
     */
 
+    public void texImage2D(final int target, final int level, final int internalformat, final int format, final int type, final CanvasView canvas) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final byte[] raw = canvas.snapshot();
+        runOnGLThread(new Runnable() {
+            @Override
+            public void run() {
+                if (flipYWebGL) {
+                    //  flipInPlace(raw, asset.getWidth(), asset.getHeight());
+                }
+                GLES20.glTexImage2D(target, level, internalformat, canvas.getWidth(), canvas.getHeight(), 0, format, type, ByteBuffer.wrap(raw));
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignored) {
+        }
+    }
+
     public void texImage2D(final int target, final int level, final int internalformat, final int format, final int type, final ImageAsset asset) {
         final CountDownLatch lock = new CountDownLatch(1);
         runOnGLThread(new Runnable() {
@@ -2706,6 +2725,23 @@ public class WebGLRenderingContext implements CanvasRenderingContext {
             @Override
             public void run() {
                 GLES20.glTexSubImage2D(target, level, xoffset, yoffset, width, height, format, type, FloatBuffer.wrap(pixels));
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignored) {
+        }
+    }
+
+    public void texSubImage2D(final int target, final int level, final int xoffset, final int yoffset, final int format, final int type, final CanvasView canvas) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final byte[] raw = canvas.snapshot();
+        runOnGLThread(new Runnable() {
+            @Override
+            public void run() {
+                ByteBuffer buffer = ByteBuffer.wrap(raw);
+                GLES20.glTexSubImage2D(target, level, xoffset, yoffset, canvas.getWidth(), canvas.getHeight(), format, type, buffer);
                 lock.countDown();
             }
         });

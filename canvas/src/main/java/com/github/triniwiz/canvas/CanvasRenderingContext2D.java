@@ -1,9 +1,10 @@
 package com.github.triniwiz.canvas;
 
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.opengl.GLES10;
-import android.opengl.GLES20;
+import android.util.Log;
+import android.view.ViewGroup;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -12,11 +13,6 @@ import java.util.concurrent.CountDownLatch;
  * Created by triniwiz on 2019-07-06
  */
 public class CanvasRenderingContext2D implements CanvasRenderingContext {
-
-    private boolean imageSmoothingEnabled = false;
-
-    private ImageSmoothingQuality imageSmoothingQuality = ImageSmoothingQuality.Low;
-
     private static native long nativeRect(long canvas_ptr, float x, float y, float width, float height);
 
     private static native long nativeStroke(long canvas_ptr);
@@ -83,13 +79,19 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeQuadraticCurveTo(long canvas, float cpx, float cpy, float x, float y);
 
+    private static native long nativeDrawImageCanvas(long canvas, byte[] image, int width, int height, float dx, float dy);
+
     private static native long nativeDrawImage(long canvas, Bitmap image, float dx, float dy);
 
     private static native long nativeDrawImageRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy);
 
+    private static native long nativeDrawImageCanvasDw(long canvas, byte[] image, int width, int height, float dx, float dy, float dWidth, float dHeight);
+
     private static native long nativeDrawImageDw(long canvas, Bitmap image, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeDrawImageDwRaw(long canvas, byte[] pixels, int originalWidth, int originalHeight, float dx, float dy, float dWidth, float dHeight);
+
+    private static native long nativeDrawImageCanvasSw(long canvas, byte[] image, int width, int height, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
     private static native long nativeDrawImageSw(long canvas, Bitmap image, float sx, float sy, float sWidth, float sHeight, float dx, float dy, float dWidth, float dHeight);
 
@@ -99,7 +101,11 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
 
     private static native long nativeSetFillColorRgba(long canvas_ptr, int r, int g, int b, int a);
 
+    private static native long nativeSetFillColor(long canvas_ptr, int color);
+
     private static native long nativeSetStrokeColorRgba(long canvas_ptr, int r, int g, int b, int a);
+
+    private static native long nativeSetStrokeColor(long canvas_ptr, int color);
 
     private static native long nativeSetShadowBlur(long canvas, float blur);
 
@@ -156,6 +162,14 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     private static native boolean nativeIsPointInStrokeWithPath(long canvas, long path, float x, float y);
 
     private static native byte[] nativeGetImageData(long canvas, float sx, float sy, int width, int height);
+
+    private static native long nativeSetFillPattern(long canvas, long pattern);
+
+    private static native long nativeSetStrokePattern(long canvas, long pattern);
+
+    private static native String nativeGetDirection(long canvas);
+
+    private static native long nativeSetDirection(long canvas, String direction);
 
     private CanvasView canvasView;
 
@@ -215,60 +229,142 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
     final Object lock = new Object();
     long state = 0;
     long currentPath = 0;
+    private boolean imageSmoothingEnabled = false;
+    private ImageSmoothingQuality imageSmoothingQuality = ImageSmoothingQuality.Low;
     private float lineWidth = 1;
-    private ICanvasColorStyle fillStyle = new CanvasColorStyle.Color(Color.BLACK);
-    private ICanvasColorStyle strokeStyle = new CanvasColorStyle.Color(Color.BLACK);
+    private Object fillStyle = Color.BLACK;
+    private Object strokeStyle = Color.BLACK;
     private CanvasCompositeOperationType globalCompositeOperation = CanvasCompositeOperationType.SourceOver;
     private CanvasTextAlignment textAlign = CanvasTextAlignment.Start;
     private float globalAlpha = 1;
-    String font = "10px sans-serif";
+    private String font = "10px sans-serif";
     private LineCap lineCap = LineCap.Butt;
     private LineJoin lineJoin = LineJoin.Miter;
     private float lineDashOffset = 0f;
     private float miterLimit = 10;
+    private String direction = "ltr";
+    private float shadowBlur = 0;
+    private int shadowColor = Color.TRANSPARENT;
+    private float shadowOffsetX = 0;
+    private float shadowOffsetY = 0;
+    private float[] lineDash = new float[0];
 
-    public ICanvasColorStyle getFillStyle() {
+    public void setDirection(final String direction) {
+        if (direction.equals("ltr") || direction.equals("rtl")) {
+            canvasView.canvas = nativeSetDirection(canvasView.canvas, direction);
+        }
+    }
+
+    public String getDirection() {
+        return direction;
+    }
+
+    public Object getFillStyle() {
         return fillStyle;
     }
 
-    private void setFillStyleInternal(ICanvasColorStyle fillStyle) {
-        this.fillStyle = fillStyle;
-    }
-
-    private void setStrokeStyleInternal(ICanvasColorStyle strokeStyle) {
-        this.strokeStyle = strokeStyle;
-    }
-
-    public void setFillStyle(final ICanvasColorStyle fillStyle) {
+    public void setFillStyle(final int fillStyle) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                switch (fillStyle.getStyleType()) {
-                    case Color:
-                        CanvasColorStyle.Color color = (CanvasColorStyle.Color) fillStyle;
-                        CanvasRenderingContext2D.nativeSetFillColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
-                        break;
-                    case Pattern:
-                        break;
-                    case Gradient:
-                        CanvasColorStyle.Gradient gradient = (CanvasColorStyle.Gradient) fillStyle;
-                        if (gradient instanceof CanvasColorStyle.LinearGradient) {
-                            CanvasColorStyle.LinearGradient g = (CanvasColorStyle.LinearGradient) gradient;
-                            canvasView.canvas = CanvasRenderingContext2D.nativeSetFillGradientLinear(canvasView.canvas, g.x0, g.y0, g.x1, g.y1, gradient.getColors(), gradient.getPositions());
-                        } else if (gradient instanceof CanvasColorStyle.RadialGradient) {
-                            CanvasColorStyle.RadialGradient g = (CanvasColorStyle.RadialGradient) gradient;
-                            canvasView.canvas = CanvasRenderingContext2D.nativeSetFillGradientRadial(canvasView.canvas, g.x0, g.y0, g.r0, g.x1, g.y1, g.r1, gradient.getColors(), gradient.getPositions());
-                        }
-                        break;
-                }
-                setFillStyleInternal(fillStyle);
-
+                canvasView.canvas = nativeSetFillColor(canvasView.canvas, fillStyle);
             }
         });
+        this.fillStyle = fillStyle;
     }
 
-    public ICanvasColorStyle getStrokeStyle() {
+    public void setFillStyle(final Object fillStyle) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (fillStyle instanceof ICanvasColorStyle) {
+                    switch (((ICanvasColorStyle) fillStyle).getStyleType()) {
+                        case Color:
+                            com.github.triniwiz.canvas.Color color = (com.github.triniwiz.canvas.Color) fillStyle;
+                            canvasView.canvas = nativeSetFillColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
+                            break;
+                        case Pattern:
+                            Pattern pattern = (Pattern) fillStyle;
+                            canvasView.canvas = nativeSetFillPattern(canvasView.canvas, pattern.nativePattern);
+                            break;
+                        case Gradient:
+                            Gradient gradient = (Gradient) fillStyle;
+                            if (gradient instanceof LinearGradient) {
+                                LinearGradient g = (LinearGradient) gradient;
+                                canvasView.canvas = nativeSetFillGradientLinear(canvasView.canvas, g.x0, g.y0, g.x1, g.y1, gradient.getColors(), gradient.getPositions());
+                            } else if (gradient instanceof RadialGradient) {
+                                RadialGradient g = (RadialGradient) gradient;
+                                canvasView.canvas = nativeSetFillGradientRadial(canvasView.canvas, g.x0, g.y0, g.r0, g.x1, g.y1, g.r1, gradient.getColors(), gradient.getPositions());
+                            }
+                            break;
+                    }
+                } else {
+                    if (fillStyle == null) {
+                        canvasView.canvas = nativeSetFillColor(canvasView.canvas, Color.BLACK);
+                    } else if (fillStyle instanceof String) {
+                        com.github.triniwiz.canvas.Color color = new com.github.triniwiz.canvas.Color((String) fillStyle);
+                        canvasView.canvas = nativeSetFillColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
+                    } else {
+                        canvasView.canvas = nativeSetFillColor(canvasView.canvas, (int) fillStyle);
+                    }
+                }
+            }
+        });
+        this.fillStyle = fillStyle;
+    }
+
+    public Object getStrokeStyle() {
         return strokeStyle;
+    }
+
+    public void setStrokeStyle(final int strokeStyle) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeSetStrokeColor(canvasView.canvas, strokeStyle);
+            }
+        });
+        this.strokeStyle = strokeStyle;
+    }
+
+    public void setStrokeStyle(final Object strokeStyle) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                if (strokeStyle instanceof ICanvasColorStyle) {
+                    switch (((ICanvasColorStyle) strokeStyle).getStyleType()) {
+                        case Color:
+                            com.github.triniwiz.canvas.Color color = (com.github.triniwiz.canvas.Color) strokeStyle;
+                            canvasView.canvas = CanvasRenderingContext2D.nativeSetStrokeColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
+                            break;
+                        case Pattern:
+                            Pattern pattern = (Pattern) strokeStyle;
+                            canvasView.canvas = nativeSetStrokePattern(canvasView.canvas, pattern.nativePattern);
+                            break;
+                        case Gradient:
+                            Gradient gradient = (Gradient) strokeStyle;
+                            if (gradient instanceof LinearGradient) {
+                                LinearGradient g = (LinearGradient) gradient;
+                                canvasView.canvas = CanvasRenderingContext2D.nativeSetStrokeGradientLinear(canvasView.canvas, g.x0, g.y0, g.x1, g.y1, gradient.getColors(), gradient.getPositions());
+                            } else if (gradient instanceof RadialGradient) {
+                                RadialGradient g = (RadialGradient) gradient;
+                                canvasView.canvas = CanvasRenderingContext2D.nativeSetStrokeGradientRadial(canvasView.canvas, g.x0, g.y0, g.r0, g.x1, g.y1, g.r1, gradient.getColors(), gradient.getPositions());
+                            }
+                            break;
+                    }
+                } else {
+                    if (strokeStyle == null) {
+                        canvasView.canvas = nativeSetStrokeColor(canvasView.canvas, Color.BLACK);
+                    } else if (strokeStyle instanceof String) {
+                        com.github.triniwiz.canvas.Color color = new com.github.triniwiz.canvas.Color((String) strokeStyle);
+                        canvasView.canvas = nativeSetStrokeColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
+                    } else {
+                        canvasView.canvas = nativeSetStrokeColor(canvasView.canvas, (int) strokeStyle);
+                    }
+                }
+            }
+        });
+        this.strokeStyle = strokeStyle;
     }
 
     public float getLineWidth() {
@@ -279,54 +375,38 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineWidth(canvasView.canvas, lineWidth);
-                setLineWidthInternal(lineWidth);
+                canvasView.canvas = nativeSetLineWidth(canvasView.canvas, lineWidth);
             }
         });
-    }
-
-    private void setLineWidthInternal(float lineWidth) {
         this.lineWidth = lineWidth;
-    }
-
-    private void setLineCapInternal(final LineCap lineCap) {
-        this.lineCap = lineCap;
     }
 
     public void setLineCap(final LineCap lineCap) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineCap(canvasView.canvas, lineCap.toString());
-                setLineCapInternal(lineCap);
+                canvasView.canvas = nativeSetLineCap(canvasView.canvas, lineCap.toString());
             }
         });
+        this.lineCap = lineCap;
     }
 
     public LineCap getLineCap() {
         return lineCap;
     }
 
-    private void setLineJoinInternal(final LineJoin lineJoin) {
-        this.lineJoin = lineJoin;
-    }
-
     public void setLineJoin(final LineJoin lineJoin) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineJoin(canvasView.canvas, lineJoin.toString());
-                setLineJoinInternal(lineJoin);
+                canvasView.canvas = nativeSetLineJoin(canvasView.canvas, lineJoin.toString());
             }
         });
+        this.lineJoin = lineJoin;
     }
 
     public LineJoin getLineJoin() {
         return lineJoin;
-    }
-
-    private void setMiterLimitInternal(final float limit) {
-        this.miterLimit = limit;
     }
 
     public void setMiterLimit(final float limit) {
@@ -334,38 +414,27 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
             @Override
             public void run() {
                 canvasView.canvas = nativeSetMiterLimit(canvasView.canvas, limit);
-                setMiterLimitInternal(limit);
             }
         });
+        this.miterLimit = limit;
     }
 
     public float getMiterLimit() {
         return miterLimit;
     }
 
-
-    private void setLineDashOffsetInternal(float offset) {
-        this.lineDashOffset = offset;
-    }
-
     public void setLineDashOffset(final float offset) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineDashOffset(canvasView.canvas, offset);
-                setLineDashOffset(offset);
+                canvasView.canvas = nativeSetLineDashOffset(canvasView.canvas, offset);
             }
         });
+        this.lineDashOffset = offset;
     }
 
     public float getLineDashOffset() {
         return lineDashOffset;
-    }
-
-    private float[] lineDash = new float[0];
-
-    public void setLineDashInternal(final float[] dash) {
-        lineDash = dash;
     }
 
     public float[] getLineDash() {
@@ -376,37 +445,10 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetLineDash(canvasView.canvas, dash);
-                setLineDashInternal(dash);
+                canvasView.canvas = nativeSetLineDash(canvasView.canvas, dash);
             }
         });
-    }
-
-    public void setStrokeStyle(final ICanvasColorStyle strokeStyle) {
-        canvasView.queueEvent(new Runnable() {
-            @Override
-            public void run() {
-                switch (strokeStyle.getStyleType()) {
-                    case Color:
-                        CanvasColorStyle.Color color = (CanvasColorStyle.Color) strokeStyle;
-                        CanvasRenderingContext2D.nativeSetStrokeColorRgba(canvasView.canvas, Color.red(color.color), Color.green(color.color), Color.blue(color.color), Color.alpha(color.color));
-                        break;
-                    case Pattern:
-                        break;
-                    case Gradient:
-                        CanvasColorStyle.Gradient gradient = (CanvasColorStyle.Gradient) strokeStyle;
-                        if (gradient instanceof CanvasColorStyle.LinearGradient) {
-                            CanvasColorStyle.LinearGradient g = (CanvasColorStyle.LinearGradient) gradient;
-                            canvasView.canvas = CanvasRenderingContext2D.nativeSetStrokeGradientLinear(canvasView.canvas, g.x0, g.y0, g.x1, g.y1, gradient.getColors(), gradient.getPositions());
-                        } else if (gradient instanceof CanvasColorStyle.RadialGradient) {
-                            CanvasColorStyle.RadialGradient g = (CanvasColorStyle.RadialGradient) gradient;
-                            canvasView.canvas = CanvasRenderingContext2D.nativeSetStrokeGradientRadial(canvasView.canvas, g.x0, g.y0, g.r0, g.x1, g.y1, g.r1, gradient.getColors(), gradient.getPositions());
-                        }
-                        break;
-                }
-                setStrokeStyleInternal(strokeStyle);
-            }
-        });
+        this.lineDash = dash;
     }
 
 
@@ -420,7 +462,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeClearRect(canvasView.canvas, x, y, width, height);
+                canvasView.canvas = nativeClearRect(canvasView.canvas, x, y, width, height);
                 updateCanvas();
             }
         });
@@ -478,7 +520,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeRect(canvasView.canvas, x, y, width, height);
+                canvasView.canvas = nativeRect(canvasView.canvas, x, y, width, height);
             }
         });
     }
@@ -663,34 +705,38 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         return canvasView;
     }
 
-    public CanvasColorStyle.LinearGradient createLinearGradient(float x0, float y0, float x1, float y1) {
-        return new CanvasColorStyle.LinearGradient(x0, y0, x1, y1);
+    public LinearGradient createLinearGradient(float x0, float y0, float x1, float y1) {
+        return new LinearGradient(x0, y0, x1, y1);
     }
 
-    public CanvasColorStyle.RadialGradient createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1) {
-        return new CanvasColorStyle.RadialGradient(x0, y0, r0, x1, y1, r1);
+    public RadialGradient createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1) {
+        return new RadialGradient(x0, y0, r0, x1, y1, r1);
     }
 
-    public CanvasColorStyle.Pattern createPattern(Object src, CanvasColorStyle.Pattern.PatternRepetition repetition) {
-        return new CanvasColorStyle.Pattern(src, repetition);
+    public Pattern createPattern(CanvasView src, Pattern.PatternRepetition repetition) {
+        return new Pattern(canvasView, src, repetition);
+    }
+
+    public Pattern createPattern(Bitmap src, Pattern.PatternRepetition repetition) {
+        return new Pattern(canvasView, src, repetition);
+    }
+
+    public Pattern createPattern(ImageAsset src, Pattern.PatternRepetition repetition) {
+        return new Pattern(canvasView, src, repetition);
     }
 
     public CanvasCompositeOperationType getGlobalCompositeOperation() {
         return globalCompositeOperation;
     }
 
-    private void setGlobalCompositeOperationInternal(CanvasCompositeOperationType globalCompositeOperation) {
-        this.globalCompositeOperation = globalCompositeOperation;
-    }
-
     public void setGlobalCompositeOperation(final CanvasCompositeOperationType globalCompositeOperation) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetGlobalCompositeOperation(canvasView.canvas, globalCompositeOperation.type);
-                setGlobalCompositeOperationInternal(globalCompositeOperation);
+                canvasView.canvas = nativeSetGlobalCompositeOperation(canvasView.canvas, globalCompositeOperation.type);
             }
         });
+        this.globalCompositeOperation = globalCompositeOperation;
     }
 
 
@@ -698,39 +744,30 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         return globalAlpha;
     }
 
-    private void setGlobalAlphaInternal(float alpha) {
-        this.globalAlpha = alpha;
-    }
-
     public void setGlobalAlpha(float alpha) {
         if (alpha == 0 || alpha > 1) {
             alpha = 1;
         }
         final int globalAlpha = (int) (alpha * 255);
-        final float finalAlpha = alpha;
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
                 canvasView.canvas = nativeSetGlobalAlpha(canvasView.canvas, globalAlpha);
-                setGlobalAlphaInternal(finalAlpha);
             }
         });
+        this.globalAlpha = globalAlpha;
     }
 
     public CanvasTextAlignment getTextAlign() {
         return textAlign;
     }
 
-    private void setTextAlignInternal(final CanvasTextAlignment textAlign) {
-        this.textAlign = textAlign;
-    }
 
     public void setTextAlign(final CanvasTextAlignment textAlign) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetTextAlignment(canvasView.canvas, textAlign.toString());
-                setTextAlignInternal(textAlign);
+                canvasView.canvas = nativeSetTextAlignment(canvasView.canvas, textAlign.toString());
             }
         });
     }
@@ -739,7 +776,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSave(canvasView.canvas);
+                canvasView.canvas = nativeSave(canvasView.canvas);
                 updateCanvas();
             }
         });
@@ -749,7 +786,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeRestore(canvasView.canvas);
+                canvasView.canvas = nativeRestore(canvasView.canvas);
                 updateCanvas();
             }
         });
@@ -760,8 +797,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetTransform(canvasView.canvas, a, b, c, d, e, f);
-                updateCanvas();
+                canvasView.canvas = nativeSetTransform(canvasView.canvas, a, b, c, d, e, f);
             }
         });
     }
@@ -770,8 +806,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeTransform(canvasView.canvas, a, b, c, d, e, f);
-                updateCanvas();
+                canvasView.canvas = nativeTransform(canvasView.canvas, a, b, c, d, e, f);
             }
         });
     }
@@ -780,8 +815,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeScale(canvasView.canvas, x, y);
-                updateCanvas();
+                canvasView.canvas = nativeScale(canvasView.canvas, x, y);
             }
         });
     }
@@ -790,8 +824,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeRotate(canvasView.canvas, angle);
-                updateCanvas();
+                canvasView.canvas = nativeRotate(canvasView.canvas, angle);
             }
         });
     }
@@ -800,8 +833,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeTranslate(canvasView.canvas, x, y);
-                updateCanvas();
+                canvasView.canvas = nativeTranslate(canvasView.canvas, x, y);
             }
         });
     }
@@ -810,7 +842,42 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeQuadraticCurveTo(canvasView.canvas, cpx, cpy, x, y);
+                canvasView.canvas = nativeQuadraticCurveTo(canvasView.canvas, cpx, cpy, x, y);
+            }
+        });
+    }
+
+
+    public void drawImage(final CanvasView image, final float dx, final float dy) {
+        final byte[] ss = image.snapshot();
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                width = params.width;
+            }
+        }
+
+        if (height == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                height = params.height;
+            }
+        }
+        if (width < 1) {
+            width = 1;
+        }
+        if (height < 1) {
+            height = 1;
+        }
+        final int finalWidth = width;
+        final int finalHeight = height;
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeDrawImageCanvas(canvasView.canvas, ss, finalWidth, finalHeight, dx, dy);
+                updateCanvas();
             }
         });
     }
@@ -819,17 +886,52 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImage(canvasView.canvas, image, dx, dy);
+                canvasView.canvas = nativeDrawImage(canvasView.canvas, image, dx, dy);
                 updateCanvas();
             }
         });
     }
 
+
     public void drawImage(final ImageAsset asset, final float dx, final float dy) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy);
+                canvasView.canvas = nativeDrawImageRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void drawImage(final CanvasView image, final float dx, final float dy, final float dWidth, final float dHeight) {
+        final byte[] ss = image.snapshot();
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                width = params.width;
+            }
+        }
+
+        if (height == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                height = params.height;
+            }
+        }
+        if (width < 1) {
+            width = 1;
+        }
+        if (height < 1) {
+            height = 1;
+        }
+        final int finalWidth = width;
+        final int finalHeight = height;
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeDrawImageCanvasDw(canvasView.canvas, ss, finalWidth, finalHeight, dx, dy, dWidth, dHeight);
                 updateCanvas();
             }
         });
@@ -839,7 +941,7 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageDw(canvasView.canvas, image, dx, dy, dWidth, dHeight);
+                canvasView.canvas = nativeDrawImageDw(canvasView.canvas, image, dx, dy, dWidth, dHeight);
                 updateCanvas();
             }
         });
@@ -849,7 +951,42 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageDwRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy, dWidth, dHeight);
+                canvasView.canvas = nativeDrawImageDwRaw(canvasView.canvas, asset.getBytes(), asset.getWidth(), asset.getHeight(), dx, dy, dWidth, dHeight);
+                updateCanvas();
+            }
+        });
+    }
+
+    public void drawImage(final CanvasView image, final float sx, final float sy, final float sWidth, final float sHeight, final float dx, final float dy, final float dWidth, final float dHeight) {
+        final byte[] ss = image.snapshot();
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (image.getWidth() == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                width = params.width;
+            }
+        }
+
+        if (image.getHeight() == 0) {
+            ViewGroup.LayoutParams params = image.getLayoutParams();
+            if (params != null) {
+                height = params.height;
+            }
+        }
+        if (width < 1) {
+            width = 1;
+        }
+        if (height < 1) {
+            height = 1;
+        }
+
+        final int finalWidth = width;
+        final int finalHeight = height;
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = CanvasRenderingContext2D.nativeDrawImageCanvasSw(canvasView.canvas, ss, finalWidth, finalHeight, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
                 updateCanvas();
             }
         });
@@ -875,93 +1012,86 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         });
     }
 
-    private float shadowBlurInternal = 0;
-    private int shadowColorInternal = Color.BLACK;
-    private float shadowOffsetXInternal = 0;
-    private float shadowOffsetYInternal = 0;
-    private String fontInternal = "10px sans-serif";
-
     public void setShadowBlur(final float blur) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowBlur(canvasView.canvas, blur);
-                shadowBlurInternal = blur;
+                canvasView.canvas = nativeSetShadowBlur(canvasView.canvas, blur);
             }
         });
+        shadowBlur = blur;
     }
 
     public float getShadowBlur() {
-        return shadowBlurInternal;
+        return shadowBlur;
     }
 
     public void setShadowColor(final int color) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowColor(canvasView.canvas, color);
-                shadowColorInternal = color;
+                canvasView.canvas = nativeSetShadowColor(canvasView.canvas, color);
             }
         });
+        shadowColor = color;
     }
 
     public int getShadowColor() {
-        return shadowColorInternal;
+        return shadowColor;
     }
 
     public void setShadowOffsetX(final float x) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowOffsetX(canvasView.canvas, x);
-                shadowOffsetXInternal = x;
+                canvasView.canvas = nativeSetShadowOffsetX(canvasView.canvas, x);
             }
         });
+        shadowOffsetX = x;
     }
 
     public float getShadowOffsetX() {
-        return shadowOffsetXInternal;
+        return shadowOffsetX;
     }
 
     public void setShadowOffsetY(final float y) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetShadowOffsetY(canvasView.canvas, y);
-                shadowOffsetYInternal = y;
+                canvasView.canvas = nativeSetShadowOffsetY(canvasView.canvas, y);
             }
         });
+        this.shadowOffsetY = y;
     }
 
     public float getShadowOffsetY() {
-        return shadowOffsetYInternal;
+        return shadowOffsetY;
     }
 
     public void setFont(final String font) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetFont(canvasView.canvas, font);
-                fontInternal = font;
+                canvasView.canvas = nativeSetFont(canvasView.canvas, font);
             }
         });
     }
 
     public String getFont() {
-        return fontInternal;
+        return font;
     }
 
     public CanvasTextMetrics measureText(String text) {
-        return CanvasRenderingContext2D.nativeMeasureText(canvasView.canvas, text);
+        return nativeMeasureText(canvasView.canvas, text);
     }
 
     public ImageData createImageData(int width, int height) {
-        byte[] data = CanvasRenderingContext2D.nativeCreateImageData(width, height);
+        byte[] data = nativeCreateImageData(width, height);
         return new ImageData(width, height, data);
     }
 
     public ImageData createImageData(ImageData imageData) {
-        byte[] data = CanvasRenderingContext2D.nativeCreateImageData(imageData.getWidth(), imageData.getHeight());
+        byte[] data = nativeCreateImageData(imageData.getWidth(), imageData.getHeight());
         return new ImageData(imageData.getWidth(), imageData.getHeight(), data);
     }
 
@@ -977,49 +1107,55 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativePutImageData(canvasView.canvas, data.getWidth(), data.getHeight(), data.getData(), x, y, dirtyX, dirtyY, dirtyWidth, dirtyHeight);
+                canvasView.canvas = nativePutImageData(canvasView.canvas, data.getWidth(), data.getHeight(), data.getData(), x, y, dirtyX, dirtyY, dirtyWidth, dirtyHeight);
                 updateCanvas();
             }
         });
     }
 
-    public ImageData getImageData(float sx, float sy, int sw, int sh) {
-        byte[] data = CanvasRenderingContext2D.nativeGetImageData(canvasView.canvas, sx, sy, sw, sh);
-        return new ImageData(sw, sh, data);
+    public ImageData getImageData(final float sx, final float sy, final int sw, final int sh) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final byte[][] data = new byte[1][];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                data[0] = nativeGetImageData(canvasView.canvas, sx, sy, sw, sh);
+                lock.countDown();
+            }
+        });
+
+        try {
+            lock.await();
+        } catch (InterruptedException ignored) {
+        }
+
+        return new ImageData(sw, sh, data[0]);
     }
 
     public boolean getImageSmoothingEnabled() {
         return imageSmoothingEnabled;
     }
 
-    private void setImageSmoothingEnabledInternal(final boolean enabled) {
-        imageSmoothingEnabled = enabled;
-    }
 
     public void setImageSmoothingEnabled(final boolean enabled) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetImageSmoothingEnabled(canvasView.canvas, enabled);
-                setImageSmoothingEnabledInternal(enabled);
+                canvasView.canvas = nativeSetImageSmoothingEnabled(canvasView.canvas, enabled);
             }
         });
+        imageSmoothingEnabled = enabled;
     }
 
     public ImageSmoothingQuality getImageSmoothingQuality() {
         return imageSmoothingQuality;
     }
 
-    private void setImageSmoothingQualityInternal(final ImageSmoothingQuality quality) {
-        this.imageSmoothingQuality = quality;
-    }
-
     public void setImageSmoothingQuality(final ImageSmoothingQuality quality) {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeSetImageSmoothingQuality(canvasView.canvas, quality.quality);
-                setImageSmoothingQualityInternal(quality);
+                canvasView.canvas = nativeSetImageSmoothingQuality(canvasView.canvas, quality.quality);
             }
         });
     }
@@ -1028,22 +1164,38 @@ public class CanvasRenderingContext2D implements CanvasRenderingContext {
         canvasView.queueEvent(new Runnable() {
             @Override
             public void run() {
-                canvasView.canvas = CanvasRenderingContext2D.nativeResetTransform(canvasView.canvas);
-                updateCanvas();
+                canvasView.canvas = nativeResetTransform(canvasView.canvas);
             }
         });
     }
 
-    public void setCurrentTransform(CanvasDOMMatrix matrix) {
-        nativeSetCurrentTransform(canvasView.canvas, matrix.matrix);
+    public void setCurrentTransform(final CanvasDOMMatrix matrix) {
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                canvasView.canvas = nativeSetCurrentTransform(canvasView.canvas, matrix.matrix);
+            }
+        });
     }
 
     public CanvasDOMMatrix getCurrentTransform() {
-        long matrix = nativeGetCurrentTransform(canvasView.canvas);
-        if (matrix == 0) {
+        final CountDownLatch lock = new CountDownLatch(1);
+        final long[] id = new long[1];
+        canvasView.queueEvent(new Runnable() {
+            @Override
+            public void run() {
+                id[0] = nativeGetCurrentTransform(canvasView.canvas);
+                lock.countDown();
+            }
+        });
+        try {
+            lock.await();
+        } catch (InterruptedException ignored) {
+        }
+        if (id[0] == 0) {
             return new CanvasDOMMatrix();
         }
-        return new CanvasDOMMatrix(matrix);
+        return new CanvasDOMMatrix(id[0]);
     }
 
     public boolean isPointInPath(final float x, final float y) {

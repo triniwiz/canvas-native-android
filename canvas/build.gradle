@@ -10,7 +10,7 @@ buildscript {
 ext {
     PUBLISH_GROUP_ID = 'com.github.triniwiz'
     PUBLISH_ARTIFACT_ID = 'canvas'
-    PUBLISH_VERSION = '0.7.1'
+    PUBLISH_VERSION = '0.8.0'
 }
 
 
@@ -18,18 +18,13 @@ apply plugin: 'com.android.library'
 apply plugin: 'com.novoda.bintray-release'
 
 android {
-    compileSdkVersion 29
+    compileSdkVersion 30
     defaultConfig {
         minSdkVersion 17
-        targetSdkVersion 29
+        targetSdkVersion 30
         versionCode 1
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
-        externalNativeBuild {
-            cmake {
-                arguments '-DANDROID_STL=c++_static'
-            }
-        }
     }
 
     buildTypes {
@@ -38,19 +33,12 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
-    externalNativeBuild {
-        cmake {
-            version '3.10.2'
-            path 'src/main/cpp/CMakeLists.txt'
-        }
-    }
-
 }
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
     implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'androidx.core:core:1.3.0'
     testImplementation 'junit:junit:4.12'
     androidTestImplementation 'androidx.test:runner:1.2.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.2.0'
@@ -60,7 +48,7 @@ publish {
     userOrg = 'triniwiz'
     groupId = 'com.github.triniwiz'
     artifactId = 'canvas'
-    publishVersion = '0.7.1'
+    publishVersion = '0.8.0'
     desc = ''
     website = ''
 }
